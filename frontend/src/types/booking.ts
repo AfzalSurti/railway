@@ -92,3 +92,17 @@ export type HumanAction = {
   resolvedAt: string | null;
   expiresAt: string;
 };
+
+export type PaymentStatus = 'REQUIRED' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+
+export type PaymentTransaction = {
+  id: string;
+  bookingTaskId: string;
+  provider: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

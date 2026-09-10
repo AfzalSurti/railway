@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { bookingService } from '../services/booking.service';
 import { humanActionService } from '../services/humanAction.service';
+import { paymentService } from '../services/payment.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { getAuthenticatedUserId } from '../middleware/requireAuth';
 import { CreateBookingInput, UpdateBookingInput } from '../schemas/booking.schema';
@@ -114,6 +115,16 @@ export const bookingController = {
       req.params.actionId,
     );
     sendSuccess(res, action, 'Human action marked complete');
+  },
+
+  async listPayments(req: Request, res: Response): Promise<void> {
+    const payments = await paymentService.listForBooking(getAuthenticatedUserId(req), req.params.id);
+    sendSuccess(res, payments);
+  },
+
+  async authorizePayment(req: Request, res: Response): Promise<void> {
+    const payment = await paymentService.authorize(getAuthenticatedUserId(req), req.params.id);
+    sendSuccess(res, payment, 'Payment authorization recorded');
   },
 
   async logs(req: Request, res: Response): Promise<void> {

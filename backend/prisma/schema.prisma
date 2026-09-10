@@ -151,10 +151,29 @@ model BookingTask {
   logs                   ExecutionLog[]
   attempts               BookingAttempt[]
   humanActions           HumanActionRequest[]
+  payments               PaymentTransaction[]
 
   @@index([userId])
   @@index([status])
   @@index([scheduledAt])
+}
+
+model PaymentTransaction {
+  id            String        @id @default(uuid())
+  bookingTaskId String
+  provider      String
+  // Minor currency units (e.g. paise). No card number / CVV / UPI PIN is ever stored.
+  amount        Int
+  currency      String
+  status        PaymentStatus @default(REQUIRED)
+  providerRef   String?
+  failureReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  bookingTask   BookingTask   @relation(fields: [bookingTaskId], references: [id], onDelete: Cascade)
+
+  @@index([bookingTaskId])
+  @@index([status])
 }
 
 model HumanActionRequest {

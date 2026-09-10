@@ -10,7 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { bookingService } from '../services/booking.service';
 import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import type { BookingTask, ExecutionLog, HumanAction } from '../types/booking';
+import type { BookingTask, ExecutionLog, HumanAction, PaymentTransaction } from '../types/booking';
 import { formatDate, formatDateTime, formatStartsIn, toDatetimeLocalValue } from '../utils/format';
 
 const ACTIVE_STATUSES = new Set([
@@ -39,6 +39,7 @@ export function BookingDetailPage() {
   const [booking, setBooking] = useState<BookingTask | null>(null);
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [actions, setActions] = useState<HumanAction[]>([]);
+  const [payments, setPayments] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -47,14 +48,16 @@ export function BookingDetailPage() {
   const [now, setNow] = useState(Date.now());
 
   async function refresh(bookingId: string) {
-    const [task, executionLogs, humanActions] = await Promise.all([
+    const [task, executionLogs, humanActions, paymentRows] = await Promise.all([
       bookingService.getById(bookingId),
       bookingService.logs(bookingId),
       bookingService.actions(bookingId).catch(() => [] as HumanAction[]),
+      bookingService.payments(bookingId).catch(() => [] as PaymentTransaction[]),
     ]);
     setBooking(task);
     setLogs(executionLogs);
     setActions(humanActions);
+    setPayments(paymentRows);
   }
 
   useEffect(() => {
@@ -255,6 +258,60 @@ export function BookingDetailPage() {
                     }}
                   >
                     Mark complete
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {payments.length > 0 ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold">Payment</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Provider-hosted payment. No card number, CVV, UPI PIN, or OTP is entered or stored here.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {payments.map((payment) => (
+              <li
+                key={payment.id}
+                className="flex flex-col gap-2 rounded-xl border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {(payment.amount / 100).toLocaleString(undefined, {
+                      style: 'currency',
+                      currency: payment.currency,
+                    })}
+                    <span className="ml-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {payment.status}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {payment.provider}
+                    {payment.failureReason ? ` · ${payment.failureReason}` : ''}
+                  </p>
+                </div>
+                {(payment.status === 'PROCESSING' || payment.status === 'REQUIRED' || payment.status === 'FAILED') &&
+                booking.status === 'PAYMENT_REQUIRED' ? (
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await bookingService.authorizePayment(booking.id);
+                        await refresh(booking.id);
+                        notify({ variant: 'success', title: 'Payment authorization recorded' });
+                      } catch (error) {
+                        notify({
+                          variant: 'error',
+                          title: 'Authorization failed',
+                          message: getApiErrorMessage(error),
+                        });
+                      }
+                    }}
+                  >
+                    Authorize payment
                   </Button>
                 ) : null}
               </li>

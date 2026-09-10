@@ -63,6 +63,7 @@ const envSchema = z.object({
   PROVIDER_RECONCILE_ENABLED: booleanFromEnv,
   PAYMENT_PROVIDER: z.string().min(1).default('MOCK'),
   PAYMENT_CURRENCY: z.string().min(1).default('INR'),
+  PAYMENT_MOCK_AMOUNT_MINOR: z.coerce.number().int().min(0).default(150000),
   TICKET_STORAGE_DIR: z.string().min(1).default('./artifacts/tickets'),
   TICKET_MAX_BYTES: z.coerce.number().int().min(1024).default(10 * 1024 * 1024),
   HUMAN_ACTION_TTL_MS: z.coerce.number().int().min(60_000).default(30 * 60 * 1000),

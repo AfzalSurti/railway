@@ -7,6 +7,7 @@ import { BookingExecutor, RetryableExecutionError } from '../execution/booking-e
 import { actionTypeForOutcome } from '../execution/provider-result-mapper';
 import { transitionBookingState } from '../execution/booking-state-machine';
 import { humanActionService, toHumanActionType } from './humanAction.service';
+import { paymentService } from './payment.service';
 import { BookingExecutionJob, isRetryableFailureCode } from '../queue/queue.types';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -227,6 +228,7 @@ export const bookingExecutionService = {
         actionRequiredMessage: result.failureReason,
         currentStage: 'PAYMENT_REQUIRED',
       });
+      await paymentService.requirePayment({ bookingTaskId, description: result.failureReason });
       await humanActionService.createForBooking({
         bookingTaskId,
         type: 'PAYMENT',

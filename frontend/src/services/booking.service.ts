@@ -1,6 +1,12 @@
 import { api } from './api';
 import type { ApiSuccess } from '../types/api';
-import type { BookingInput, BookingTask, ExecutionLog, HumanAction } from '../types/booking';
+import type {
+  BookingInput,
+  BookingTask,
+  ExecutionLog,
+  HumanAction,
+  PaymentTransaction,
+} from '../types/booking';
 
 export const bookingService = {
   async list() {
@@ -47,6 +53,16 @@ export const bookingService = {
   async resolveAction(id: string, actionId: string) {
     const { data } = await api.post<ApiSuccess<HumanAction>>(
       `/api/bookings/${id}/actions/${actionId}/resolve`,
+    );
+    return data.data;
+  },
+  async payments(id: string) {
+    const { data } = await api.get<ApiSuccess<PaymentTransaction[]>>(`/api/bookings/${id}/payment`);
+    return data.data;
+  },
+  async authorizePayment(id: string) {
+    const { data } = await api.post<ApiSuccess<PaymentTransaction>>(
+      `/api/bookings/${id}/payment/authorize`,
     );
     return data.data;
   },
