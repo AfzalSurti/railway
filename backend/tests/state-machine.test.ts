@@ -25,4 +25,14 @@ describe('Booking state machine', () => {
     expect(canTransition(BookingStatus.CANCELLED, BookingStatus.SCHEDULED)).toBe(false);
     expect(() => assertCanTransition(BookingStatus.COMPLETED, BookingStatus.RUNNING)).toThrow(AppError);
   });
+
+  it('supports UNKNOWN_RESULT as a held, resolvable state', () => {
+    expect(canTransition(BookingStatus.RUNNING, BookingStatus.UNKNOWN_RESULT)).toBe(true);
+    expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.COMPLETED)).toBe(true);
+    expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.FAILED)).toBe(true);
+    expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.QUEUED)).toBe(true);
+    expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.CANCELLED)).toBe(true);
+    // never straight back to RUNNING without an explicit human requeue
+    expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.RUNNING)).toBe(false);
+  });
 });
