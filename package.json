@@ -1,0 +1,29 @@
+{
+  "name": "ai-travel-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI Travel Booking Agent — Phase 1 application foundation",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,worker,frontend -c cyan,green,magenta \"npm run dev:api -w backend\" \"npm run dev:worker -w backend\" \"npm run dev -w frontend\"",
+    "dev:api": "npm run dev:api -w backend",
+    "dev:worker": "npm run dev:worker -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "test": "npm run test -w backend",
+    "playwright:install": "npm run playwright:install -w backend",
+    "playwright:test": "npm run playwright:test -w backend",
+    "format": "prettier --write \"backend/src/**/*.ts\" \"frontend/src/**/*.{ts,tsx,css}\" \"backend/prisma/**/*.ts\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

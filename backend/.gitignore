@@ -1,0 +1,45 @@
+# Always ignore API keys and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and Code Editors
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Common runtime diagnostics
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Browser automation artifacts and storage
+artifacts/
+**/playwright/.auth/
+**/*.storage-state.json
+test-results/
+playwright-report/
+blob-report/
