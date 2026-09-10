@@ -78,3 +78,17 @@ export type ExecutionLog = {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 };
+
+export type HumanActionType = 'LOGIN' | 'OTP' | 'CAPTCHA' | 'PAYMENT' | 'CONFIRMATION' | 'MANUAL_REVIEW';
+export type HumanActionStatus = 'PENDING' | 'RESOLVED' | 'EXPIRED' | 'CANCELLED';
+
+export type HumanAction = {
+  id: string;
+  bookingTaskId: string;
+  type: HumanActionType;
+  status: HumanActionStatus;
+  message: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  expiresAt: string;
+};

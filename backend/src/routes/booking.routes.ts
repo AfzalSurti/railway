@@ -18,6 +18,8 @@ router.post('/:id/cancel', asyncHandler(bookingController.cancel));
 router.put('/:id/reschedule', validateBody(rescheduleBookingSchema), asyncHandler(bookingController.reschedule));
 router.post('/:id/run', validateBody(runBookingSchema), asyncHandler(bookingController.runNow));
 router.post('/:id/resume', asyncHandler(bookingController.resume));
+router.get('/:id/actions', asyncHandler(bookingController.listActions));
+router.post('/:id/actions/:actionId/resolve', asyncHandler(bookingController.resolveAction));
 router.get('/:id/logs', asyncHandler(bookingController.logs));
 
 export default router;

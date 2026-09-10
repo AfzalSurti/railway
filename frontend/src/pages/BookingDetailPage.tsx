@@ -10,10 +10,16 @@ import { StatusBadge } from '../components/StatusBadge';
 import { bookingService } from '../services/booking.service';
 import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import type { BookingTask, ExecutionLog } from '../types/booking';
+import type { BookingTask, ExecutionLog, HumanAction } from '../types/booking';
 import { formatDate, formatDateTime, formatStartsIn, toDatetimeLocalValue } from '../utils/format';
 
-const ACTIVE_STATUSES = new Set(['QUEUED', 'RUNNING', 'AUTHENTICATION_REQUIRED', 'PAYMENT_REQUIRED']);
+const ACTIVE_STATUSES = new Set([
+  'QUEUED',
+  'RUNNING',
+  'AUTHENTICATION_REQUIRED',
+  'PAYMENT_REQUIRED',
+  'UNKNOWN_RESULT',
+]);
 
 const PIPELINE_STAGES = [
   { step: 'OPENING_PROVIDER', label: 'Provider opened' },
@@ -32,6 +38,7 @@ export function BookingDetailPage() {
   const { notify } = useToast();
   const [booking, setBooking] = useState<BookingTask | null>(null);
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
+  const [actions, setActions] = useState<HumanAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -40,12 +47,14 @@ export function BookingDetailPage() {
   const [now, setNow] = useState(Date.now());
 
   async function refresh(bookingId: string) {
-    const [task, executionLogs] = await Promise.all([
+    const [task, executionLogs, humanActions] = await Promise.all([
       bookingService.getById(bookingId),
       bookingService.logs(bookingId),
+      bookingService.actions(bookingId).catch(() => [] as HumanAction[]),
     ]);
     setBooking(task);
     setLogs(executionLogs);
+    setActions(humanActions);
   }
 
   useEffect(() => {
@@ -83,12 +92,15 @@ export function BookingDetailPage() {
     booking.status === 'SCHEDULED' ||
     booking.status === 'QUEUED' ||
     booking.status === 'AUTHENTICATION_REQUIRED' ||
-    booking.status === 'PAYMENT_REQUIRED';
+    booking.status === 'PAYMENT_REQUIRED' ||
+    booking.status === 'UNKNOWN_RESULT';
   const showCancelRequested = booking.status === 'RUNNING';
   const canReschedule = booking.status === 'SCHEDULED';
   const canRunNow = import.meta.env.DEV && booking.status === 'SCHEDULED';
   const canResume =
-    booking.status === 'AUTHENTICATION_REQUIRED' || booking.status === 'PAYMENT_REQUIRED';
+    booking.status === 'AUTHENTICATION_REQUIRED' ||
+    booking.status === 'PAYMENT_REQUIRED' ||
+    booking.status === 'UNKNOWN_RESULT';
 
   const fields = [
     ['Booking ID', booking.id],
@@ -200,6 +212,54 @@ export function BookingDetailPage() {
         <Card className="border-rose-200 p-5">
           <p className="text-sm font-semibold text-rose-700">{booking.failureCode}</p>
           <p className="mt-1 text-sm text-slate-600">{booking.failureReason}</p>
+        </Card>
+      ) : null}
+
+      {actions.length > 0 ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold">Human action requests</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Complete the required step with the provider, then mark it done. No OTP, password, or
+            card detail is ever entered or stored here.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {actions.map((action) => (
+              <li
+                key={action.id}
+                className="flex flex-col gap-2 rounded-xl border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {action.type.replaceAll('_', ' ')}
+                    <span className="ml-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {action.status}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">{action.message}</p>
+                </div>
+                {action.status === 'PENDING' ? (
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await bookingService.resolveAction(booking.id, action.id);
+                        await refresh(booking.id);
+                        notify({ variant: 'success', title: 'Marked complete' });
+                      } catch (error) {
+                        notify({
+                          variant: 'error',
+                          title: 'Could not resolve',
+                          message: getApiErrorMessage(error),
+                        });
+                      }
+                    }}
+                  >
+                    Mark complete
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 

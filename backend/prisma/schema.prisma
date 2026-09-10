@@ -56,16 +56,47 @@ enum ActionRequiredType {
   MANUAL_REVIEW
 }
 
+enum HumanActionType {
+  LOGIN
+  OTP
+  CAPTCHA
+  PAYMENT
+  CONFIRMATION
+  MANUAL_REVIEW
+}
+
+enum HumanActionStatus {
+  PENDING
+  RESOLVED
+  EXPIRED
+  CANCELLED
+}
+
+enum ProviderSessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum PaymentStatus {
+  REQUIRED
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
 model User {
-  id           String        @id @default(uuid())
-  name         String
-  email        String        @unique
-  phone        String
-  passwordHash String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  passengers   Passenger[]
-  bookingTasks BookingTask[]
+  id               String            @id @default(uuid())
+  name             String
+  email            String            @unique
+  phone            String
+  passwordHash     String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  passengers       Passenger[]
+  bookingTasks     BookingTask[]
+  providerSessions ProviderSession[]
 }
 
 model Passenger {
@@ -119,10 +150,43 @@ model BookingTask {
   passengers             BookingPassenger[]
   logs                   ExecutionLog[]
   attempts               BookingAttempt[]
+  humanActions           HumanActionRequest[]
 
   @@index([userId])
   @@index([status])
   @@index([scheduledAt])
+}
+
+model HumanActionRequest {
+  id            String            @id @default(uuid())
+  bookingTaskId String
+  type          HumanActionType
+  status        HumanActionStatus @default(PENDING)
+  message       String
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  resolvedAt    DateTime?
+  expiresAt     DateTime
+  bookingTask   BookingTask       @relation(fields: [bookingTaskId], references: [id], onDelete: Cascade)
+
+  @@index([bookingTaskId])
+  @@index([status])
+}
+
+model ProviderSession {
+  id        String                @id @default(uuid())
+  userId    String
+  provider  String
+  status    ProviderSessionStatus @default(ACTIVE)
+  // Opaque handle to an externally held session. NEVER a raw password, cookie, or OTP.
+  reference String
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  expiresAt DateTime
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@index([status])
 }
 
 model BookingAttempt {

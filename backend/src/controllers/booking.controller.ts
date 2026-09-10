@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { bookingService } from '../services/booking.service';
+import { humanActionService } from '../services/humanAction.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { getAuthenticatedUserId } from '../middleware/requireAuth';
 import { CreateBookingInput, UpdateBookingInput } from '../schemas/booking.schema';
@@ -99,6 +100,20 @@ export const bookingController = {
   async resume(req: Request, res: Response): Promise<void> {
     const booking = await bookingService.resume(getAuthenticatedUserId(req), req.params.id);
     sendSuccess(res, bookingPayload(booking), 'Booking queued to resume after human action');
+  },
+
+  async listActions(req: Request, res: Response): Promise<void> {
+    const actions = await humanActionService.listForBooking(getAuthenticatedUserId(req), req.params.id);
+    sendSuccess(res, actions);
+  },
+
+  async resolveAction(req: Request, res: Response): Promise<void> {
+    const action = await humanActionService.resolve(
+      getAuthenticatedUserId(req),
+      req.params.id,
+      req.params.actionId,
+    );
+    sendSuccess(res, action, 'Human action marked complete');
   },
 
   async logs(req: Request, res: Response): Promise<void> {

@@ -1,6 +1,6 @@
 import { api } from './api';
 import type { ApiSuccess } from '../types/api';
-import type { BookingInput, BookingTask, ExecutionLog } from '../types/booking';
+import type { BookingInput, BookingTask, ExecutionLog, HumanAction } from '../types/booking';
 
 export const bookingService = {
   async list() {
@@ -38,6 +38,16 @@ export const bookingService = {
   },
   async logs(id: string) {
     const { data } = await api.get<ApiSuccess<ExecutionLog[]>>(`/api/bookings/${id}/logs`);
+    return data.data;
+  },
+  async actions(id: string) {
+    const { data } = await api.get<ApiSuccess<HumanAction[]>>(`/api/bookings/${id}/actions`);
+    return data.data;
+  },
+  async resolveAction(id: string, actionId: string) {
+    const { data } = await api.post<ApiSuccess<HumanAction>>(
+      `/api/bookings/${id}/actions/${actionId}/resolve`,
+    );
     return data.data;
   },
 };

@@ -6,6 +6,7 @@ import { providerBookingExecutor } from '../execution/provider-booking-executor'
 import { BookingExecutor, RetryableExecutionError } from '../execution/booking-executor';
 import { actionTypeForOutcome } from '../execution/provider-result-mapper';
 import { transitionBookingState } from '../execution/booking-state-machine';
+import { humanActionService, toHumanActionType } from './humanAction.service';
 import { BookingExecutionJob, isRetryableFailureCode } from '../queue/queue.types';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -192,14 +193,20 @@ export const bookingExecutionService = {
         failureCode: result.failureCode,
         failureReason: result.failureReason,
       });
+      const authActionType = actionTypeForOutcome(result) ?? 'LOGIN';
       await transitionBookingState(bookingTaskId, BookingStatus.AUTHENTICATION_REQUIRED, {
         failureCode: result.failureCode,
         failureReason: result.failureReason,
         message: result.failureReason,
         actionRequired: true,
-        actionRequiredType: actionTypeForOutcome(result) ?? 'LOGIN',
+        actionRequiredType: authActionType,
         actionRequiredMessage: result.failureReason,
         currentStage: 'AUTHENTICATION_REQUIRED',
+      });
+      await humanActionService.createForBooking({
+        bookingTaskId,
+        type: toHumanActionType(authActionType),
+        message: result.failureReason,
       });
       throw new UnrecoverableError(result.failureReason);
     }
@@ -220,6 +227,11 @@ export const bookingExecutionService = {
         actionRequiredMessage: result.failureReason,
         currentStage: 'PAYMENT_REQUIRED',
       });
+      await humanActionService.createForBooking({
+        bookingTaskId,
+        type: 'PAYMENT',
+        message: result.failureReason,
+      });
       throw new UnrecoverableError(result.failureReason);
     }
 
@@ -238,6 +250,11 @@ export const bookingExecutionService = {
         actionRequiredType: 'MANUAL_REVIEW',
         actionRequiredMessage: result.failureReason,
         currentStage: 'UNKNOWN_RESULT',
+      });
+      await humanActionService.createForBooking({
+        bookingTaskId,
+        type: 'MANUAL_REVIEW',
+        message: result.failureReason,
       });
       throw new UnrecoverableError(result.failureReason);
     }

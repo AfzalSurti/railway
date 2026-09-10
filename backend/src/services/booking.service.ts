@@ -1,6 +1,7 @@
 import { BookingStatus, Passenger } from '@prisma/client';
 import { bookingRepository, BookingWithPassengers } from '../repositories/booking.repository';
 import { executionLogRepository } from '../repositories/executionLog.repository';
+import { humanActionRepository } from '../repositories/humanAction.repository';
 import { passengerService } from './passenger.service';
 import { bookingScheduler } from '../scheduler/booking-scheduler';
 import { transitionBookingState } from '../execution/booking-state-machine';
@@ -240,6 +241,7 @@ export const bookingService = {
       return toBookingView(latest ?? existing);
     }
 
+    await humanActionRepository.closePendingForBooking(bookingId, 'CANCELLED');
     await bookingScheduler.cancelScheduledBooking(bookingId);
     const updated = await transitionBookingState(bookingId, BookingStatus.CANCELLED, {
       cancellationRequested: true,
@@ -280,11 +282,13 @@ export const bookingService = {
     const existing = await requireOwned(userId, bookingId);
     if (
       existing.status !== BookingStatus.AUTHENTICATION_REQUIRED &&
-      existing.status !== BookingStatus.PAYMENT_REQUIRED
+      existing.status !== BookingStatus.PAYMENT_REQUIRED &&
+      existing.status !== BookingStatus.UNKNOWN_RESULT
     ) {
       throw AppError.conflict(`Cannot resume a booking in ${existing.status} status`);
     }
 
+    await humanActionRepository.closePendingForBooking(bookingId, 'RESOLVED');
     await bookingScheduler.cancelScheduledBooking(bookingId);
     const queued = await transitionBookingState(bookingId, BookingStatus.QUEUED, {
       actionRequired: false,
