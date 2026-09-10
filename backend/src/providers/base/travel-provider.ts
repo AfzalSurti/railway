@@ -1,15 +1,20 @@
 import { ProviderContext } from './provider-context';
+import { ProviderCapability } from '../provider-capabilities';
 import {
+  AvailabilityOption,
   AvailabilityRequest,
   AvailabilityResult,
   BookingPreparationResult,
   BookingResult,
+  BookingStatusQuery,
+  BookingStatusResult,
+  CancellationResult,
   JourneyOption,
   ProviderHealthStatus,
   SearchRequest,
   SearchResult,
   ServiceType,
-  AvailabilityOption,
+  TicketDownloadResult,
 } from '../provider.types';
 
 export type BookingRequest = {
@@ -24,6 +29,9 @@ export interface TravelProvider {
   supports(serviceType: ServiceType): boolean;
   getHealth(): ProviderHealthStatus;
   getDescription(): string;
+  getCapabilities(): ProviderCapability[];
+  hasCapability(capability: ProviderCapability): boolean;
+
   search(request: SearchRequest, context: ProviderContext): Promise<SearchResult>;
   checkAvailability(
     request: AvailabilityRequest,
@@ -31,4 +39,20 @@ export interface TravelProvider {
   ): Promise<AvailabilityResult>;
   prepareBooking(request: BookingRequest): Promise<BookingPreparationResult>;
   executeBooking(request: BookingRequest): Promise<BookingResult>;
+
+  /** Capability: STATUS_RECONCILIATION. Used to resolve UNKNOWN_RESULT safely. */
+  getBookingStatus?(
+    query: BookingStatusQuery,
+    context: ProviderContext,
+  ): Promise<BookingStatusResult>;
+  /** Capability: TICKET_DOWNLOAD. */
+  downloadTicket?(
+    providerBookingReference: string,
+    context: ProviderContext,
+  ): Promise<TicketDownloadResult>;
+  /** Capability: CANCELLATION. */
+  cancelBooking?(
+    providerBookingReference: string,
+    context: ProviderContext,
+  ): Promise<CancellationResult>;
 }

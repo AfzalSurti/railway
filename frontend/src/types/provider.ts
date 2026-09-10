@@ -6,4 +6,5 @@ export type ProviderInfo = {
   available: boolean;
   health: ProviderHealth;
   description: string;
+  capabilities: string[];
 };

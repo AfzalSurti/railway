@@ -8,6 +8,7 @@ const styles: Record<BookingStatus, string> = {
   RUNNING: 'bg-amber-50 text-amber-700',
   AUTHENTICATION_REQUIRED: 'bg-orange-50 text-orange-700',
   PAYMENT_REQUIRED: 'bg-violet-50 text-violet-700',
+  UNKNOWN_RESULT: 'bg-rose-100 text-rose-800 ring-rose-200',
   COMPLETED: 'bg-emerald-50 text-emerald-700',
   FAILED: 'bg-rose-50 text-rose-700',
   CANCELLED: 'bg-slate-100 text-slate-500',

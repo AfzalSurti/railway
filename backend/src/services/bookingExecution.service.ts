@@ -230,15 +230,14 @@ export const bookingExecutionService = {
         failureCode: result.failureCode,
         failureReason: result.failureReason,
       });
-      await transitionBookingState(bookingTaskId, BookingStatus.FAILED, {
-        failedAt: new Date(),
+      await transitionBookingState(bookingTaskId, BookingStatus.UNKNOWN_RESULT, {
         failureCode: result.failureCode,
         failureReason: result.failureReason,
         message: result.failureReason,
-        actionRequired: result.outcome === 'UNKNOWN_RESULT',
-        actionRequiredType: result.outcome === 'UNKNOWN_RESULT' ? 'MANUAL_REVIEW' : 'NONE',
-        actionRequiredMessage: result.outcome === 'UNKNOWN_RESULT' ? result.failureReason : null,
-        currentStage: result.outcome === 'UNKNOWN_RESULT' ? 'UNKNOWN_RESULT' : 'BOOKING_FAILED',
+        actionRequired: true,
+        actionRequiredType: 'MANUAL_REVIEW',
+        actionRequiredMessage: result.failureReason,
+        currentStage: 'UNKNOWN_RESULT',
       });
       throw new UnrecoverableError(result.failureReason);
     }

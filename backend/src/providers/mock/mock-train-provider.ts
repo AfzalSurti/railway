@@ -1,10 +1,16 @@
 import { env, MockExecutorOutcome } from '../../config/env';
+import { ProviderCapability } from '../provider-capabilities';
+import { BaseTravelProvider } from '../base/base-travel-provider';
 import { ProviderContext } from '../base/provider-context';
-import { BookingRequest, TravelProvider } from '../base/travel-provider';
+import { BookingRequest } from '../base/travel-provider';
 import {
   ProviderAuthenticationError,
+  ProviderBookingRejectedError,
   ProviderCaptchaError,
+  ProviderOtpRequiredError,
   ProviderPaymentRequiredError,
+  ProviderPriceChangedError,
+  ProviderTicketDownloadError,
   ProviderTimeoutError,
   ProviderUnavailableError,
   ProviderUnknownResultError,
@@ -14,33 +20,44 @@ import {
   AvailabilityResult,
   BookingPreparationResult,
   BookingResult,
+  BookingStatusQuery,
+  BookingStatusResult,
+  CancellationResult,
   JourneyOption,
   ProviderHealthStatus,
   SearchRequest,
   SearchResult,
   ServiceType,
+  TicketDownloadResult,
 } from '../provider.types';
 import { sleep } from '../../utils/time';
+
+const ALLOWED_OUTCOMES: MockExecutorOutcome[] = [
+  'SUCCESS',
+  'TRAIN_NOT_FOUND',
+  'NO_SEATS',
+  'WEBSITE_TIMEOUT',
+  'NETWORK_ERROR',
+  'TEMPORARY_SERVER_ERROR',
+  'PAYMENT_FAILED',
+  'PAYMENT_REQUIRED',
+  'AUTHENTICATION_REQUIRED',
+  'OTP_REQUIRED',
+  'CAPTCHA_REQUIRED',
+  'PRICE_CHANGED',
+  'BOOKING_REJECTED',
+  'TICKET_DOWNLOAD_FAILED',
+  'UNKNOWN_ERROR',
+  'UNKNOWN_RESULT',
+  'UNKNOWN_RESULT_RECONCILE_CONFIRMED',
+  'UNKNOWN_RESULT_RECONCILE_FAILED',
+];
 
 function resolveOutcome(stored: string | null | undefined): MockExecutorOutcome {
   if (env.NODE_ENV === 'production') {
     return 'SUCCESS';
   }
-  const allowed: MockExecutorOutcome[] = [
-    'SUCCESS',
-    'TRAIN_NOT_FOUND',
-    'NO_SEATS',
-    'WEBSITE_TIMEOUT',
-    'NETWORK_ERROR',
-    'TEMPORARY_SERVER_ERROR',
-    'PAYMENT_FAILED',
-    'PAYMENT_REQUIRED',
-    'AUTHENTICATION_REQUIRED',
-    'CAPTCHA_REQUIRED',
-    'UNKNOWN_ERROR',
-    'UNKNOWN_RESULT',
-  ];
-  if (stored && allowed.includes(stored as MockExecutorOutcome)) {
+  if (stored && ALLOWED_OUTCOMES.includes(stored as MockExecutorOutcome)) {
     return stored as MockExecutorOutcome;
   }
   return env.MOCK_EXECUTOR_OUTCOME;
@@ -61,14 +78,26 @@ function journeyFromContext(context: ProviderContext, request: SearchRequest): J
   };
 }
 
-export class MockTrainProvider implements TravelProvider {
-  getProviderName(): string {
-    return 'MOCK';
-  }
+/** Minimal valid single-page PDF used for mock ticket downloads. */
+const MOCK_TICKET_PDF_BASE64 =
+  'JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAw' +
+  'IG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8' +
+  'PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCAyMDAgMjAwXT4+CmVuZG9iagp4' +
+  'cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1' +
+  'OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAw' +
+  'IFI+PgpzdGFydHhyZWYKMTkwCiUlRU9GCg==';
 
-  supports(serviceType: ServiceType): boolean {
-    return serviceType === 'TRAIN';
-  }
+export class MockTrainProvider extends BaseTravelProvider {
+  protected readonly name = 'MOCK';
+  protected readonly serviceTypes: readonly ServiceType[] = ['TRAIN'];
+  protected readonly capabilities: readonly ProviderCapability[] = [
+    'SEARCH',
+    'AVAILABILITY',
+    'BOOKING',
+    'CANCELLATION',
+    'TICKET_DOWNLOAD',
+    'STATUS_RECONCILIATION',
+  ];
 
   getHealth(): ProviderHealthStatus {
     return 'AVAILABLE';
@@ -87,11 +116,7 @@ export class MockTrainProvider implements TravelProvider {
       return { found: false, journeys: [], message: 'Train not found' };
     }
 
-    const journey = journeyFromContext(context, request);
-    return {
-      found: true,
-      journeys: [journey],
-    };
+    return { found: true, journeys: [journeyFromContext(context, request)] };
   }
 
   async checkAvailability(
@@ -119,13 +144,7 @@ export class MockTrainProvider implements TravelProvider {
     const travelClass = request.travelClass ?? request.journey.classes[0] ?? '3A';
     return {
       available: true,
-      options: [
-        {
-          class: travelClass,
-          status: 'AVAILABLE',
-          seats: 12,
-        },
-      ],
+      options: [{ class: travelClass, status: 'AVAILABLE', seats: 12 }],
     };
   }
 
@@ -141,57 +160,110 @@ export class MockTrainProvider implements TravelProvider {
     const outcome = resolveOutcome(request.context.mockOutcome);
 
     if (outcome === 'PAYMENT_REQUIRED') {
-      throw new ProviderPaymentRequiredError('Payment authentication required');
+      throw new ProviderPaymentRequiredError();
     }
     if (outcome === 'PAYMENT_FAILED') {
-      return {
-        status: 'FAILED',
-        failureCode: 'PAYMENT_FAILED',
-        message: 'Payment failed',
-        retryable: false,
-      };
+      return { status: 'FAILED', failureCode: 'PAYMENT_FAILED', message: 'Payment failed', retryable: false };
     }
-    if (outcome === 'UNKNOWN_RESULT') {
+    if (outcome === 'PRICE_CHANGED') {
+      throw new ProviderPriceChangedError();
+    }
+    if (outcome === 'BOOKING_REJECTED') {
+      throw new ProviderBookingRejectedError();
+    }
+    if (
+      outcome === 'UNKNOWN_RESULT' ||
+      outcome === 'UNKNOWN_RESULT_RECONCILE_CONFIRMED' ||
+      outcome === 'UNKNOWN_RESULT_RECONCILE_FAILED'
+    ) {
       throw new ProviderUnknownResultError();
     }
     if (outcome === 'UNKNOWN_ERROR') {
-      return {
-        status: 'FAILED',
-        failureCode: 'UNKNOWN_ERROR',
-        message: 'An unknown error occurred',
-        retryable: false,
-      };
+      return { status: 'FAILED', failureCode: 'UNKNOWN_ERROR', message: 'An unknown error occurred', retryable: false };
     }
 
     const bookingReference = `MOCK-${Math.floor(100000 + Math.random() * 900000)}`;
+    return { status: 'SUCCESS', providerBookingReference: bookingReference, message: 'Booking confirmed' };
+  }
+
+  async getBookingStatus(
+    query: BookingStatusQuery,
+    context: ProviderContext,
+  ): Promise<BookingStatusResult> {
+    this.assertCapability('STATUS_RECONCILIATION');
+    await this.pause();
+    const outcome = resolveOutcome(context.mockOutcome);
+
+    if (outcome === 'UNKNOWN_RESULT_RECONCILE_CONFIRMED') {
+      return {
+        state: 'CONFIRMED',
+        providerBookingReference: query.providerBookingReference || `MOCK-${Math.floor(100000 + Math.random() * 900000)}`,
+        message: 'Reconciliation found a confirmed booking on the provider.',
+      };
+    }
+    if (outcome === 'UNKNOWN_RESULT_RECONCILE_FAILED') {
+      return {
+        state: 'FAILED',
+        providerBookingReference: null,
+        message: 'Reconciliation confirmed the booking did not go through.',
+      };
+    }
     return {
-      status: 'SUCCESS',
-      providerBookingReference: bookingReference,
-      message: 'Booking confirmed',
+      state: 'UNKNOWN',
+      providerBookingReference: null,
+      message: 'Reconciliation could not determine the booking state.',
     };
   }
 
-  private throwIfEarlyFailure(outcome: MockExecutorOutcome, phase: 'search' | 'availability' | 'prepare'): void {
-    if (outcome === 'AUTHENTICATION_REQUIRED' && (phase === 'search' || phase === 'prepare')) {
-      if (phase === 'search') {
-        throw new ProviderAuthenticationError('User authentication is required to continue.');
-      }
+  async downloadTicket(
+    providerBookingReference: string,
+    context: ProviderContext,
+  ): Promise<TicketDownloadResult> {
+    this.assertCapability('TICKET_DOWNLOAD');
+    await this.pause();
+    const outcome = resolveOutcome(context.mockOutcome);
+    if (outcome === 'TICKET_DOWNLOAD_FAILED') {
+      throw new ProviderTicketDownloadError();
+    }
+    return {
+      downloaded: true,
+      fileName: `ticket-${providerBookingReference}.pdf`,
+      mimeType: 'application/pdf',
+      contentBase64: MOCK_TICKET_PDF_BASE64,
+      message: 'Mock ticket generated',
+    };
+  }
+
+  async cancelBooking(
+    _providerBookingReference: string,
+    _context: ProviderContext,
+  ): Promise<CancellationResult> {
+    this.assertCapability('CANCELLATION');
+    await this.pause();
+    return { cancelled: true, message: 'Mock booking cancelled', refundInitiated: true };
+  }
+
+  private throwIfEarlyFailure(
+    outcome: MockExecutorOutcome,
+    phase: 'search' | 'availability' | 'prepare',
+  ): void {
+    if (outcome === 'AUTHENTICATION_REQUIRED' && phase === 'search') {
+      throw new ProviderAuthenticationError();
+    }
+    if (outcome === 'OTP_REQUIRED' && phase === 'search') {
+      throw new ProviderOtpRequiredError();
     }
     if (outcome === 'CAPTCHA_REQUIRED' && phase === 'search') {
       throw new ProviderCaptchaError();
     }
     if (outcome === 'WEBSITE_TIMEOUT' && phase === 'search') {
-      throw new ProviderTimeoutError('Booking website timed out');
+      throw new ProviderTimeoutError('Booking website timed out', 'SEARCH');
     }
     if (outcome === 'NETWORK_ERROR' && phase === 'search') {
       throw new ProviderUnavailableError('Network error while contacting provider', 'NETWORK_ERROR', true);
     }
     if (outcome === 'TEMPORARY_SERVER_ERROR' && phase === 'search') {
-      throw new ProviderUnavailableError(
-        'Temporary provider server error',
-        'TEMPORARY_SERVER_ERROR',
-        true,
-      );
+      throw new ProviderUnavailableError('Temporary provider server error', 'TEMPORARY_SERVER_ERROR', true);
     }
   }
 

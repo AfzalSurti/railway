@@ -19,9 +19,21 @@ export const BOOKING_RESULT_STATUSES = [
   'AUTHENTICATION_REQUIRED',
   'PAYMENT_REQUIRED',
   'CAPTCHA_REQUIRED',
+  'PRICE_CHANGED',
+  'BOOKING_REJECTED',
   'UNKNOWN_RESULT',
 ] as const;
 export type BookingResultStatus = (typeof BOOKING_RESULT_STATUSES)[number];
+
+export const PROVIDER_BOOKING_STATES = [
+  'CONFIRMED',
+  'FAILED',
+  'PENDING',
+  'CANCELLED',
+  'NOT_FOUND',
+  'UNKNOWN',
+] as const;
+export type ProviderBookingState = (typeof PROVIDER_BOOKING_STATES)[number];
 
 export const ACTION_REQUIRED_TYPES = [
   'NONE',
@@ -54,6 +66,8 @@ export const EXECUTION_STAGES = [
   'AUTHENTICATION_REQUIRED',
   'PAYMENT_REQUIRED',
   'CONFIRMING_BOOKING',
+  'RECONCILING',
+  'DOWNLOADING_TICKET',
   'BOOKING_CONFIRMED',
   'BOOKING_FAILED',
   'UNKNOWN_RESULT',
@@ -127,10 +141,37 @@ export type BookingResult = {
   retryable?: boolean;
 };
 
+export type BookingStatusQuery = {
+  providerBookingReference: string;
+  journey?: JourneyOption;
+};
+
+export type BookingStatusResult = {
+  state: ProviderBookingState;
+  providerBookingReference: string | null;
+  message: string;
+};
+
+export type TicketDownloadResult = {
+  downloaded: boolean;
+  fileName: string;
+  mimeType: string;
+  /** Base64-encoded file contents. Never a filesystem path. */
+  contentBase64: string;
+  message?: string;
+};
+
+export type CancellationResult = {
+  cancelled: boolean;
+  message: string;
+  refundInitiated?: boolean;
+};
+
 export type ProviderDescriptor = {
   name: string;
   serviceType: ServiceType;
   available: boolean;
   health: ProviderHealthStatus;
   description: string;
+  capabilities: string[];
 };

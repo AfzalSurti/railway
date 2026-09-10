@@ -40,6 +40,7 @@ export class ProviderRegistry {
         available: health === 'AVAILABLE',
         health,
         description: provider.getDescription(),
+        capabilities: provider.getCapabilities(),
       });
     }
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.serviceType.localeCompare(b.serviceType));

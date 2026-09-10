@@ -10,6 +10,7 @@ const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   RUNNING: [
     BookingStatus.AUTHENTICATION_REQUIRED,
     BookingStatus.PAYMENT_REQUIRED,
+    BookingStatus.UNKNOWN_RESULT,
     BookingStatus.COMPLETED,
     BookingStatus.FAILED,
     BookingStatus.CANCELLED,
@@ -17,6 +18,12 @@ const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   ],
   AUTHENTICATION_REQUIRED: [BookingStatus.QUEUED, BookingStatus.RUNNING, BookingStatus.FAILED, BookingStatus.CANCELLED],
   PAYMENT_REQUIRED: [BookingStatus.QUEUED, BookingStatus.RUNNING, BookingStatus.FAILED, BookingStatus.CANCELLED],
+  UNKNOWN_RESULT: [
+    BookingStatus.QUEUED,
+    BookingStatus.COMPLETED,
+    BookingStatus.FAILED,
+    BookingStatus.CANCELLED,
+  ],
   COMPLETED: [],
   FAILED: [],
   CANCELLED: [],
@@ -36,6 +43,11 @@ const STEP_BY_STATE: Record<BookingStatus, { step: string; status: ExecutionStat
     step: 'PAYMENT_REQUIRED',
     status: 'WARNING',
     message: 'Booking paused: payment required',
+  },
+  UNKNOWN_RESULT: {
+    step: 'UNKNOWN_RESULT',
+    status: 'ERROR',
+    message: 'Booking result is uncertain: manual investigation required',
   },
   COMPLETED: { step: 'BOOKING_COMPLETED', status: 'SUCCESS', message: 'Mock booking completed successfully' },
   FAILED: { step: 'BOOKING_FAILED', status: 'ERROR', message: 'Booking execution failed' },

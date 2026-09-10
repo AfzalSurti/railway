@@ -115,8 +115,8 @@ export function NewBookingPage() {
               {(providers.length > 0
                 ? providers.filter((item) => item.serviceType === serviceType)
                 : [
-                    { name: 'MOCK', serviceType: 'TRAIN', available: true, health: 'AVAILABLE', description: '' },
-                    { name: 'IRCTC', serviceType: 'TRAIN', available: false, health: 'NOT_IMPLEMENTED', description: '' },
+                    { name: 'MOCK', serviceType: 'TRAIN', available: true, health: 'AVAILABLE', description: '', capabilities: [] },
+                    { name: 'IRCTC', serviceType: 'TRAIN', available: false, health: 'NOT_IMPLEMENTED', description: '', capabilities: [] },
                   ]
               ).map((item) => (
                 <option key={`${item.serviceType}-${item.name}`} value={item.name}>

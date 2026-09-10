@@ -5,6 +5,7 @@ import {
   ProviderAuthenticationError,
   ProviderCaptchaError,
   ProviderNotImplementedError,
+  ProviderOtpRequiredError,
   ProviderPaymentRequiredError,
   ProviderTimeoutError,
   ProviderUnknownResultError,
@@ -24,6 +25,14 @@ export function mapProviderResult(result: BookingResult): BookingExecutionResult
       outcome: 'AUTHENTICATION_REQUIRED',
       failureCode: 'AUTHENTICATION_REQUIRED',
       failureReason: result.message,
+    };
+  }
+  if (result.status === 'PRICE_CHANGED' || result.status === 'BOOKING_REJECTED') {
+    return {
+      outcome: 'FAILED',
+      failureCode: result.status,
+      failureReason: result.message,
+      retryable: false,
     };
   }
   if (result.status === 'PAYMENT_REQUIRED') {
@@ -49,7 +58,11 @@ export function mapProviderResult(result: BookingResult): BookingExecutionResult
 }
 
 export function mapProviderError(error: unknown): BookingExecutionResult {
-  if (error instanceof ProviderAuthenticationError || error instanceof ProviderCaptchaError) {
+  if (
+    error instanceof ProviderAuthenticationError ||
+    error instanceof ProviderCaptchaError ||
+    error instanceof ProviderOtpRequiredError
+  ) {
     return {
       outcome: 'AUTHENTICATION_REQUIRED',
       failureCode: 'AUTHENTICATION_REQUIRED',

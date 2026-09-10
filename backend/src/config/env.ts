@@ -14,9 +14,15 @@ const mockOutcomeSchema = z.enum([
   'PAYMENT_FAILED',
   'PAYMENT_REQUIRED',
   'AUTHENTICATION_REQUIRED',
+  'OTP_REQUIRED',
   'CAPTCHA_REQUIRED',
+  'PRICE_CHANGED',
+  'BOOKING_REJECTED',
+  'TICKET_DOWNLOAD_FAILED',
   'UNKNOWN_ERROR',
   'UNKNOWN_RESULT',
+  'UNKNOWN_RESULT_RECONCILE_CONFIRMED',
+  'UNKNOWN_RESULT_RECONCILE_FAILED',
 ]);
 
 const booleanFromEnv = z.preprocess((value) => {
@@ -53,6 +59,14 @@ const envSchema = z.object({
   BROWSER_SAVE_TRACE_ON_SUCCESS: booleanFromEnv,
   BROWSER_TRACE: booleanFromEnv,
   IRCTC_BASE_URL: z.string().default(''),
+  REDBUS_BASE_URL: z.string().default(''),
+  PROVIDER_RECONCILE_ENABLED: booleanFromEnv,
+  PAYMENT_PROVIDER: z.string().min(1).default('MOCK'),
+  PAYMENT_CURRENCY: z.string().min(1).default('INR'),
+  TICKET_STORAGE_DIR: z.string().min(1).default('./artifacts/tickets'),
+  TICKET_MAX_BYTES: z.coerce.number().int().min(1024).default(10 * 1024 * 1024),
+  HUMAN_ACTION_TTL_MS: z.coerce.number().int().min(60_000).default(30 * 60 * 1000),
+  METRICS_ENABLED: booleanFromEnv,
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -69,6 +83,8 @@ export const env = {
   BROWSER_HEADLESS: data.BROWSER_HEADLESS ?? data.NODE_ENV !== 'development',
   BROWSER_SAVE_TRACE_ON_SUCCESS: data.BROWSER_SAVE_TRACE_ON_SUCCESS ?? false,
   BROWSER_TRACE: data.BROWSER_TRACE ?? data.NODE_ENV !== 'production',
+  PROVIDER_RECONCILE_ENABLED: data.PROVIDER_RECONCILE_ENABLED ?? true,
+  METRICS_ENABLED: data.METRICS_ENABLED ?? true,
 };
 
 export type MockExecutorOutcome = z.infer<typeof mockOutcomeSchema>;

@@ -4,8 +4,8 @@ import { prisma } from '../config/database';
 import { executionLogRepository } from '../repositories/executionLog.repository';
 import { providerFactory } from '../providers';
 import { ProviderContext } from '../providers/base/provider-context';
-import { BookingRequest } from '../providers/base/travel-provider';
-import { ExecutionStage, SearchRequest } from '../providers/provider.types';
+import { BookingRequest, TravelProvider } from '../providers/base/travel-provider';
+import { ExecutionStage, JourneyOption, SearchRequest } from '../providers/provider.types';
 import { ProviderTimeoutError } from '../providers/provider-errors';
 import { toDateOnly } from '../utils/mappers';
 import { logger } from '../utils/logger';
@@ -179,6 +179,17 @@ export class ProviderBookingExecutor implements BookingExecutor {
       data: { providerStatus: provider.getHealth() },
     });
 
+    for (const capability of ['SEARCH', 'AVAILABILITY', 'BOOKING'] as const) {
+      if (!provider.hasCapability(capability)) {
+        return {
+          outcome: 'FAILED',
+          failureCode: 'PROVIDER_CAPABILITY_UNSUPPORTED',
+          failureReason: `Provider ${providerName} does not support ${capability}`,
+          retryable: false,
+        };
+      }
+    }
+
     await emit('OPENING_PROVIDER', `Opening provider ${providerName}`, 'INFO', { provider: providerName });
 
     const searchRequest: SearchRequest = {
@@ -272,8 +283,20 @@ export class ProviderBookingExecutor implements BookingExecutor {
     }
 
     await emit('CONFIRMING_BOOKING', 'Confirming booking with provider', 'INFO', { provider: providerName });
-    const providerResult = await provider.executeBooking(bookingRequest);
-    const mapped = mapProviderResult(providerResult);
+    let mapped: BookingExecutionResult;
+    try {
+      mapped = mapProviderResult(await provider.executeBooking(bookingRequest));
+    } catch (error) {
+      const mappedError = mapProviderError(error);
+      if (mappedError.outcome !== 'UNKNOWN_RESULT') {
+        throw error;
+      }
+      mapped = mappedError;
+    }
+
+    if (mapped.outcome === 'UNKNOWN_RESULT') {
+      mapped = await this.reconcile(provider, providerCtx, journey, mapped, emit);
+    }
 
     if (mapped.outcome === 'SUCCESS') {
       await emit('BOOKING_CONFIRMED', mapped.message, 'SUCCESS', {
@@ -314,6 +337,61 @@ export class ProviderBookingExecutor implements BookingExecutor {
     }
 
     return mapped;
+  }
+
+  /**
+   * Phase 4.7: never blindly retry an ambiguous booking result. When the
+   * provider can report booking status, ask it once and resolve the state.
+   * If it still cannot tell, the booking stays UNKNOWN_RESULT for human review.
+   */
+  private async reconcile(
+    provider: TravelProvider,
+    context: ProviderContext,
+    journey: JourneyOption,
+    unknown: BookingExecutionResult,
+    emit: (
+      stage: ExecutionStage,
+      message: string,
+      status?: PendingLog['status'],
+      extra?: Record<string, string | number | boolean | null>,
+    ) => Promise<void>,
+  ): Promise<BookingExecutionResult> {
+    if (
+      !env.PROVIDER_RECONCILE_ENABLED ||
+      !provider.hasCapability('STATUS_RECONCILIATION') ||
+      typeof provider.getBookingStatus !== 'function'
+    ) {
+      return unknown;
+    }
+
+    await emit('RECONCILING', 'Reconciling ambiguous booking result with provider', 'WARNING', {
+      provider: provider.getProviderName(),
+    });
+
+    try {
+      const status = await provider.getBookingStatus({ providerBookingReference: '', journey }, context);
+      if (status.state === 'CONFIRMED') {
+        return {
+          outcome: 'SUCCESS',
+          bookingReference: status.providerBookingReference ?? `REF-${Date.now()}`,
+          message: `Reconciliation confirmed the booking. ${status.message}`,
+        };
+      }
+      if (status.state === 'FAILED' || status.state === 'NOT_FOUND' || status.state === 'CANCELLED') {
+        return {
+          outcome: 'FAILED',
+          failureCode: 'BOOKING_NOT_CONFIRMED',
+          failureReason: `Reconciliation confirmed the booking did not complete. ${status.message}`,
+          retryable: false,
+        };
+      }
+      return {
+        ...(unknown as Extract<BookingExecutionResult, { outcome: 'UNKNOWN_RESULT' }>),
+        failureReason: `${unknown.outcome === 'UNKNOWN_RESULT' ? unknown.failureReason : ''} Reconciliation was inconclusive.`.trim(),
+      };
+    } catch {
+      return unknown;
+    }
   }
 }
 

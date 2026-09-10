@@ -9,6 +9,7 @@ export type BookingStatus =
   | 'RUNNING'
   | 'AUTHENTICATION_REQUIRED'
   | 'PAYMENT_REQUIRED'
+  | 'UNKNOWN_RESULT'
   | 'COMPLETED'
   | 'FAILED'
   | 'CANCELLED';
