@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mock Train Provider</title>
+    <style>
+      body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; }
+      label { display: block; margin: 0.5rem 0; }
+      .hidden { display: none; }
+      .card { border: 1px solid #ccc; padding: 1rem; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Local mock train provider</h1>
+    <p>This page is for Playwright tests only. It does not contact IRCTC or any travel website.</p>
+
+    <form id="search-form">
+      <label>Source <input data-testid="source" name="source" /></label>
+      <label>Destination <input data-testid="destination" name="destination" /></label>
+      <label>Journey date <input data-testid="journey-date" name="journeyDate" placeholder="2026-08-28" /></label>
+      <label>Train number <input data-testid="train-number" name="trainNumber" /></label>
+      <button type="submit" data-testid="search">Search</button>
+    </form>
+
+    <div id="results" class="hidden">
+      <h2>Results</h2>
+      <div
+        class="card"
+        data-testid="result-row"
+        data-train-id="20902"
+        data-train-number="20902"
+        data-train-name="Vande Bharat"
+        data-departure="15:51"
+        data-arrival="18:15"
+      >
+        <p>20902 Vande Bharat · BRC → MMCT · 15:51</p>
+        <button type="button" data-testid="select-train-20902">Select 20902</button>
+      </div>
+    </div>
+
+    <div id="availability" class="card hidden" data-testid="availability">
+      <p>Class: <span data-testid="availability-class">3A</span></p>
+      <p>Status: <span data-testid="availability-status">AVAILABLE</span></p>
+      <p>Seats: <span data-testid="availability-seats">12</span></p>
+    </div>
+
+    <form id="passenger-form" class="card hidden">
+      <label>Passenger name <input data-testid="passenger-name" /></label>
+      <label>Age <input data-testid="passenger-age" type="number" /></label>
+      <button type="submit" data-testid="confirm">Confirm mock booking</button>
+    </form>
+
+    <div id="confirmation" class="card hidden">
+      <p>Booking reference: <strong data-testid="booking-reference">MOCK-209021</strong></p>
+    </div>
+
+    <script>
+      document.getElementById('search-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const source = document.querySelector('[data-testid="source"]').value.trim().toUpperCase();
+        const destination = document.querySelector('[data-testid="destination"]').value.trim().toUpperCase();
+        const trainNumber = document.querySelector('[data-testid="train-number"]').value.trim();
+        if (source === 'BRC' && destination === 'MMCT' && (!trainNumber || trainNumber === '20902')) {
+          document.getElementById('results').classList.remove('hidden');
+        }
+      });
+      document.querySelector('[data-testid="select-train-20902"]').addEventListener('click', () => {
+        document.getElementById('availability').classList.remove('hidden');
+        document.getElementById('passenger-form').classList.remove('hidden');
+      });
+      document.getElementById('passenger-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        document.getElementById('confirmation').classList.remove('hidden');
+      });
+    </script>
+  </body>
+</html>
