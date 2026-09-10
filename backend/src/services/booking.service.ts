@@ -2,6 +2,7 @@ import { BookingStatus, Passenger } from '@prisma/client';
 import { bookingRepository, BookingWithPassengers } from '../repositories/booking.repository';
 import { executionLogRepository } from '../repositories/executionLog.repository';
 import { humanActionRepository } from '../repositories/humanAction.repository';
+import { auditService } from '../observability/audit.service';
 import { passengerService } from './passenger.service';
 import { bookingScheduler } from '../scheduler/booking-scheduler';
 import { transitionBookingState } from '../execution/booking-state-machine';
@@ -155,6 +156,14 @@ export const bookingService = {
       await bookingScheduler.scheduleBooking(booking.id, userId);
     }
 
+    await auditService.record({
+      action: status === BookingStatus.SCHEDULED ? 'BOOKING_SCHEDULED' : 'BOOKING_CREATED',
+      userId,
+      bookingTaskId: booking.id,
+      provider,
+      metadata: { serviceType: input.serviceType, source: booking.source, destination: booking.destination },
+    });
+
     const latest = await bookingRepository.findById(booking.id);
     return toBookingView(latest ?? booking);
   },
@@ -248,6 +257,7 @@ export const bookingService = {
       queueJobId: null,
       message: 'Booking task cancelled by user',
     });
+    await auditService.record({ action: 'BOOKING_CANCELLED', userId, bookingTaskId: bookingId });
     return toBookingView(updated);
   },
 
@@ -297,6 +307,7 @@ export const bookingService = {
       message: 'Execution resumed after a human-required action was completed',
     });
     await bookingScheduler.enqueueImmediately(bookingId, userId);
+    await auditService.record({ action: 'BOOKING_RESUMED', userId, bookingTaskId: bookingId });
     const latest = await bookingRepository.findById(bookingId);
     return toBookingView(latest ?? queued);
   },

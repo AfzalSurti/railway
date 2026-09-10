@@ -17,10 +17,14 @@ function prismaErrorToAppError(error: Prisma.PrismaClientKnownRequestError): App
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
+  const requestId = req.id;
+  if (requestId) {
+    res.setHeader('x-request-id', requestId);
+  }
   if (err instanceof ZodError) {
     res.status(422).json({
       success: false,
@@ -64,6 +68,10 @@ export function errorHandler(
 
   const message = err instanceof Error ? err.message : 'Internal server error';
   logger.error('Unhandled error', {
+    service: 'api',
+    requestId,
+    method: req.method,
+    path: req.path,
     message,
     stack: env.NODE_ENV === 'production' ? undefined : err instanceof Error ? err.stack : undefined,
   });

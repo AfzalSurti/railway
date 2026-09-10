@@ -3,6 +3,8 @@ import { env } from '../config/env';
 import { humanActionRepository } from '../repositories/humanAction.repository';
 import { bookingRepository } from '../repositories/booking.repository';
 import { executionLogRepository } from '../repositories/executionLog.repository';
+import { auditService } from '../observability/audit.service';
+import { incr } from '../observability/metrics';
 import { AppError } from '../utils/AppError';
 import { logger } from '../utils/logger';
 
@@ -88,6 +90,12 @@ export const humanActionService = {
       event: 'HUMAN_ACTION_CREATED',
       type: input.type,
     });
+    incr('human_action_created_total');
+    await auditService.record({
+      action: 'HUMAN_ACTION_CREATED',
+      bookingTaskId: input.bookingTaskId,
+      result: input.type,
+    });
     return action;
   },
 
@@ -123,6 +131,12 @@ export const humanActionService = {
       status: 'INFO',
       message: `Human action ${action.type} marked complete by the user`,
       metadata: { humanActionId: actionId, type: action.type },
+    });
+    await auditService.record({
+      action: 'HUMAN_ACTION_RESOLVED',
+      userId,
+      bookingTaskId: bookingId,
+      result: action.type,
     });
     return toView(updated);
   },

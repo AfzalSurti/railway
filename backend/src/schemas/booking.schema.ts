@@ -58,9 +58,15 @@ export const runBookingSchema = z.object({
       'PAYMENT_FAILED',
       'PAYMENT_REQUIRED',
       'AUTHENTICATION_REQUIRED',
+      'OTP_REQUIRED',
       'CAPTCHA_REQUIRED',
+      'PRICE_CHANGED',
+      'BOOKING_REJECTED',
+      'TICKET_DOWNLOAD_FAILED',
       'UNKNOWN_ERROR',
       'UNKNOWN_RESULT',
+      'UNKNOWN_RESULT_RECONCILE_CONFIRMED',
+      'UNKNOWN_RESULT_RECONCILE_FAILED',
     ])
     .optional(),
 });

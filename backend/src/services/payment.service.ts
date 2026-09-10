@@ -8,6 +8,8 @@ import { humanActionRepository } from '../repositories/humanAction.repository';
 import { paymentRepository } from '../repositories/payment.repository';
 import { getPaymentProvider } from '../payment/payment-registry';
 import { canPaymentTransition, PaymentState } from '../payment/payment.types';
+import { auditService } from '../observability/audit.service';
+import { incr } from '../observability/metrics';
 
 export type PaymentView = {
   id: string;
@@ -146,13 +148,27 @@ export const paymentService = {
         message: 'Payment authorized by the user',
         metadata: { paymentTransactionId: txn.id },
       });
+      await auditService.record({
+        action: 'PAYMENT_COMPLETED',
+        userId,
+        bookingTaskId: bookingId,
+        provider: txn.provider,
+      });
     } else {
+      incr('payment_failures_total');
       await executionLogRepository.create({
         bookingTaskId: bookingId,
         step: 'PAYMENT_FAILED',
         status: 'ERROR',
         message: result.message,
         metadata: { paymentTransactionId: txn.id },
+      });
+      await auditService.record({
+        action: 'PAYMENT_FAILED',
+        userId,
+        bookingTaskId: bookingId,
+        provider: txn.provider,
+        result: result.message,
       });
     }
     return toView(updated);

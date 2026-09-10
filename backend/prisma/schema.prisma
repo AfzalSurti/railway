@@ -262,3 +262,20 @@ model ExecutionLog {
 
   @@index([bookingTaskId])
 }
+
+// Append-only audit trail. Deliberately has no foreign keys so events survive
+// booking/user deletion. Never stores secrets.
+model AuditEvent {
+  id            String   @id @default(uuid())
+  userId        String?
+  bookingTaskId String?
+  action        String
+  provider      String?
+  result        String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([bookingTaskId])
+  @@index([userId])
+  @@index([createdAt])
+}

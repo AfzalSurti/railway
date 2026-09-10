@@ -8,6 +8,8 @@ import { actionTypeForOutcome } from '../execution/provider-result-mapper';
 import { transitionBookingState } from '../execution/booking-state-machine';
 import { humanActionService, toHumanActionType } from './humanAction.service';
 import { paymentService } from './payment.service';
+import { auditService } from '../observability/audit.service';
+import { incr } from '../observability/metrics';
 import { BookingExecutionJob, isRetryableFailureCode } from '../queue/queue.types';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -131,6 +133,8 @@ export const bookingExecutionService = {
       status: AttemptStatus.RUNNING,
       startedAt: new Date(),
     });
+    incr('booking_attempts_total');
+    const auditBase = { bookingTaskId, userId: booking.userId, provider: booking.provider };
 
     await bookingRepository.update(bookingTaskId, {
       retryCount: Math.max(0, attemptNumber - 1),
@@ -177,6 +181,13 @@ export const bookingExecutionService = {
           currentStage: 'BOOKING_CONFIRMED',
           providerStatus: 'AVAILABLE',
         });
+        incr('booking_success_total');
+        await auditService.record({
+          ...auditBase,
+          action: 'BOOKING_COMPLETED',
+          result: 'SUCCESS',
+          metadata: { attemptNumber },
+        });
       } catch (error) {
         const latest = await bookingRepository.findById(bookingTaskId);
         if (latest?.status === BookingStatus.COMPLETED) {
@@ -209,6 +220,12 @@ export const bookingExecutionService = {
         type: toHumanActionType(authActionType),
         message: result.failureReason,
       });
+      incr('booking_authentication_required_total');
+      await auditService.record({
+        ...auditBase,
+        action: 'AUTH_REQUIRED',
+        result: result.failureCode,
+      });
       throw new UnrecoverableError(result.failureReason);
     }
 
@@ -234,6 +251,8 @@ export const bookingExecutionService = {
         type: 'PAYMENT',
         message: result.failureReason,
       });
+      incr('booking_payment_required_total');
+      await auditService.record({ ...auditBase, action: 'PAYMENT_REQUIRED' });
       throw new UnrecoverableError(result.failureReason);
     }
 
@@ -257,6 +276,12 @@ export const bookingExecutionService = {
         bookingTaskId,
         type: 'MANUAL_REVIEW',
         message: result.failureReason,
+      });
+      incr('booking_unknown_result_total');
+      await auditService.record({
+        ...auditBase,
+        action: 'UNKNOWN_RESULT',
+        result: result.failureCode,
       });
       throw new UnrecoverableError(result.failureReason);
     }
@@ -290,6 +315,16 @@ export const bookingExecutionService = {
       actionRequiredType: 'NONE',
       actionRequiredMessage: null,
       currentStage: 'BOOKING_FAILED',
+    });
+    incr('booking_failure_total');
+    if (result.failureCode.startsWith('PROVIDER_') || result.failureCode === 'WEBSITE_TIMEOUT') {
+      incr('provider_errors_total');
+    }
+    await auditService.record({
+      ...auditBase,
+      action: 'BOOKING_FAILED',
+      result: result.failureCode,
+      metadata: { attemptNumber },
     });
     throw new UnrecoverableError(result.failureReason);
   },
