@@ -106,3 +106,13 @@ export type PaymentTransaction = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type TicketArtifact = {
+  id: string;
+  bookingTaskId: string;
+  provider: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+};

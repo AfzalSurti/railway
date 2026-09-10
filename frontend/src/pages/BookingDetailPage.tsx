@@ -10,7 +10,13 @@ import { StatusBadge } from '../components/StatusBadge';
 import { bookingService } from '../services/booking.service';
 import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import type { BookingTask, ExecutionLog, HumanAction, PaymentTransaction } from '../types/booking';
+import type {
+  BookingTask,
+  ExecutionLog,
+  HumanAction,
+  PaymentTransaction,
+  TicketArtifact,
+} from '../types/booking';
 import { formatDate, formatDateTime, formatStartsIn, toDatetimeLocalValue } from '../utils/format';
 
 const ACTIVE_STATUSES = new Set([
@@ -40,6 +46,7 @@ export function BookingDetailPage() {
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [actions, setActions] = useState<HumanAction[]>([]);
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
+  const [tickets, setTickets] = useState<TicketArtifact[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -48,16 +55,18 @@ export function BookingDetailPage() {
   const [now, setNow] = useState(Date.now());
 
   async function refresh(bookingId: string) {
-    const [task, executionLogs, humanActions, paymentRows] = await Promise.all([
+    const [task, executionLogs, humanActions, paymentRows, ticketRows] = await Promise.all([
       bookingService.getById(bookingId),
       bookingService.logs(bookingId),
       bookingService.actions(bookingId).catch(() => [] as HumanAction[]),
       bookingService.payments(bookingId).catch(() => [] as PaymentTransaction[]),
+      bookingService.tickets(bookingId).catch(() => [] as TicketArtifact[]),
     ]);
     setBooking(task);
     setLogs(executionLogs);
     setActions(humanActions);
     setPayments(paymentRows);
+    setTickets(ticketRows);
   }
 
   useEffect(() => {
@@ -314,6 +323,43 @@ export function BookingDetailPage() {
                     Authorize payment
                   </Button>
                 ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {tickets.length > 0 ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold">Ticket</h2>
+          <ul className="mt-4 space-y-3">
+            {tickets.map((ticket) => (
+              <li
+                key={ticket.id}
+                className="flex flex-col gap-2 rounded-xl border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{ticket.fileName}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {ticket.provider} · {(ticket.sizeBytes / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      await bookingService.downloadTicket(booking.id, ticket.id, ticket.fileName);
+                    } catch (error) {
+                      notify({
+                        variant: 'error',
+                        title: 'Download failed',
+                        message: getApiErrorMessage(error),
+                      });
+                    }
+                  }}
+                >
+                  Download
+                </Button>
               </li>
             ))}
           </ul>

@@ -152,10 +152,26 @@ model BookingTask {
   attempts               BookingAttempt[]
   humanActions           HumanActionRequest[]
   payments               PaymentTransaction[]
+  tickets                TicketArtifact[]
 
   @@index([userId])
   @@index([status])
   @@index([scheduledAt])
+}
+
+model TicketArtifact {
+  id            String      @id @default(uuid())
+  bookingTaskId String
+  provider      String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  // Opaque storage key. The raw filesystem path is never exposed to clients.
+  storageKey    String      @unique
+  createdAt     DateTime    @default(now())
+  bookingTask   BookingTask @relation(fields: [bookingTaskId], references: [id], onDelete: Cascade)
+
+  @@index([bookingTaskId])
 }
 
 model PaymentTransaction {

@@ -6,6 +6,7 @@ import type {
   ExecutionLog,
   HumanAction,
   PaymentTransaction,
+  TicketArtifact,
 } from '../types/booking';
 
 export const bookingService = {
@@ -65,5 +66,22 @@ export const bookingService = {
       `/api/bookings/${id}/payment/authorize`,
     );
     return data.data;
+  },
+  async tickets(id: string) {
+    const { data } = await api.get<ApiSuccess<TicketArtifact[]>>(`/api/bookings/${id}/tickets`);
+    return data.data;
+  },
+  async downloadTicket(id: string, ticketId: string, fileName: string) {
+    const response = await api.get<Blob>(`/api/bookings/${id}/tickets/${ticketId}/download`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 };

@@ -8,6 +8,7 @@ import { BookingRequest, TravelProvider } from '../providers/base/travel-provide
 import { ExecutionStage, JourneyOption, SearchRequest } from '../providers/provider.types';
 import { ProviderTimeoutError } from '../providers/provider-errors';
 import { toDateOnly } from '../utils/mappers';
+import { ticketService } from '../services/ticket.service';
 import { logger } from '../utils/logger';
 import { withTimeout } from '../utils/timeout';
 import { isRetryableFailureCode } from '../queue/queue.types';
@@ -299,6 +300,7 @@ export class ProviderBookingExecutor implements BookingExecutor {
     }
 
     if (mapped.outcome === 'SUCCESS') {
+      await this.retrieveTicket(provider, providerCtx, mapped.bookingReference, emit);
       await emit('BOOKING_CONFIRMED', mapped.message, 'SUCCESS', {
         provider: providerName,
         result: 'SUCCESS',
@@ -337,6 +339,41 @@ export class ProviderBookingExecutor implements BookingExecutor {
     }
 
     return mapped;
+  }
+
+  /**
+   * Capability: TICKET_DOWNLOAD. Best-effort — the booking is already confirmed,
+   * so a ticket retrieval failure is logged as a warning and never fails it.
+   */
+  private async retrieveTicket(
+    provider: TravelProvider,
+    context: ProviderContext,
+    bookingReference: string,
+    emit: (
+      stage: ExecutionStage,
+      message: string,
+      status?: PendingLog['status'],
+      extra?: Record<string, string | number | boolean | null>,
+    ) => Promise<void>,
+  ): Promise<void> {
+    if (!provider.hasCapability('TICKET_DOWNLOAD') || typeof provider.downloadTicket !== 'function') {
+      return;
+    }
+    try {
+      await emit('DOWNLOADING_TICKET', 'Downloading ticket from provider', 'INFO', {
+        provider: provider.getProviderName(),
+      });
+      const download = await provider.downloadTicket(bookingReference, context);
+      if (download.downloaded) {
+        await ticketService.storeTicket(context.bookingTaskId, context.provider, download);
+      }
+    } catch (error) {
+      await emit('DOWNLOADING_TICKET', 'Ticket download failed; booking is still confirmed', 'WARNING', {
+        provider: provider.getProviderName(),
+        errorCode: 'TICKET_DOWNLOAD_FAILED',
+      });
+      void error;
+    }
   }
 
   /**

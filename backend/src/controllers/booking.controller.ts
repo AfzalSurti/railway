@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { bookingService } from '../services/booking.service';
 import { humanActionService } from '../services/humanAction.service';
 import { paymentService } from '../services/payment.service';
+import { ticketService } from '../services/ticket.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { getAuthenticatedUserId } from '../middleware/requireAuth';
 import { CreateBookingInput, UpdateBookingInput } from '../schemas/booking.schema';
@@ -125,6 +126,23 @@ export const bookingController = {
   async authorizePayment(req: Request, res: Response): Promise<void> {
     const payment = await paymentService.authorize(getAuthenticatedUserId(req), req.params.id);
     sendSuccess(res, payment, 'Payment authorization recorded');
+  },
+
+  async listTickets(req: Request, res: Response): Promise<void> {
+    const tickets = await ticketService.listForBooking(getAuthenticatedUserId(req), req.params.id);
+    sendSuccess(res, tickets);
+  },
+
+  async downloadTicket(req: Request, res: Response): Promise<void> {
+    const ticket = await ticketService.download(
+      getAuthenticatedUserId(req),
+      req.params.id,
+      req.params.ticketId,
+    );
+    res.setHeader('Content-Type', ticket.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${ticket.fileName}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(ticket.body);
   },
 
   async logs(req: Request, res: Response): Promise<void> {
