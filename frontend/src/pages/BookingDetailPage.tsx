@@ -11,6 +11,8 @@ import { bookingService } from '../services/booking.service';
 import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import type {
+  AuditEvent,
+  BookingAttempt,
   BookingTask,
   ExecutionLog,
   HumanAction,
@@ -47,6 +49,8 @@ export function BookingDetailPage() {
   const [actions, setActions] = useState<HumanAction[]>([]);
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
   const [tickets, setTickets] = useState<TicketArtifact[]>([]);
+  const [attempts, setAttempts] = useState<BookingAttempt[]>([]);
+  const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -55,18 +59,23 @@ export function BookingDetailPage() {
   const [now, setNow] = useState(Date.now());
 
   async function refresh(bookingId: string) {
-    const [task, executionLogs, humanActions, paymentRows, ticketRows] = await Promise.all([
-      bookingService.getById(bookingId),
-      bookingService.logs(bookingId),
-      bookingService.actions(bookingId).catch(() => [] as HumanAction[]),
-      bookingService.payments(bookingId).catch(() => [] as PaymentTransaction[]),
-      bookingService.tickets(bookingId).catch(() => [] as TicketArtifact[]),
-    ]);
+    const [task, executionLogs, humanActions, paymentRows, ticketRows, attemptRows, auditRows] =
+      await Promise.all([
+        bookingService.getById(bookingId),
+        bookingService.logs(bookingId),
+        bookingService.actions(bookingId).catch(() => [] as HumanAction[]),
+        bookingService.payments(bookingId).catch(() => [] as PaymentTransaction[]),
+        bookingService.tickets(bookingId).catch(() => [] as TicketArtifact[]),
+        bookingService.attempts(bookingId).catch(() => [] as BookingAttempt[]),
+        bookingService.audit(bookingId).catch(() => [] as AuditEvent[]),
+      ]);
     setBooking(task);
     setLogs(executionLogs);
     setActions(humanActions);
     setPayments(paymentRows);
     setTickets(ticketRows);
+    setAttempts(attemptRows);
+    setAudit(auditRows);
   }
 
   useEffect(() => {
@@ -396,6 +405,34 @@ export function BookingDetailPage() {
         </Card>
       ) : null}
 
+      {attempts.length > 0 ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold">Attempts</h2>
+          <div className="mt-4 space-y-2">
+            {attempts.map((attempt) => (
+              <div
+                key={attempt.id}
+                className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <span className="font-medium text-slate-900">Attempt #{attempt.attemptNumber}</span>
+                <span
+                  className={
+                    attempt.status === 'SUCCESS'
+                      ? 'text-emerald-700'
+                      : attempt.status === 'FAILED'
+                        ? 'text-rose-700'
+                        : 'text-slate-500'
+                  }
+                >
+                  {attempt.status}
+                  {attempt.failureCode ? ` · ${attempt.failureCode}` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="p-6">
         <h2 className="text-lg font-semibold">Passengers</h2>
         <div className="mt-4 space-y-3">
@@ -478,6 +515,25 @@ export function BookingDetailPage() {
           )}
         </div>
       </Card>
+
+      {audit.length > 0 ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold">Audit trail</h2>
+          <ul className="mt-4 space-y-1.5 text-sm">
+            {audit.map((event) => (
+              <li key={event.id} className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-800">
+                  {event.action.replaceAll('_', ' ')}
+                  {event.result ? <span className="text-slate-400"> · {event.result}</span> : null}
+                </span>
+                <span className="whitespace-nowrap text-xs text-slate-400">
+                  {formatDateTime(event.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <ConfirmDialog
         open={confirmCancel}

@@ -24,6 +24,7 @@ router.get('/:id/payment', asyncHandler(bookingController.listPayments));
 router.post('/:id/payment/authorize', asyncHandler(bookingController.authorizePayment));
 router.get('/:id/tickets', asyncHandler(bookingController.listTickets));
 router.get('/:id/tickets/:ticketId/download', asyncHandler(bookingController.downloadTicket));
+router.get('/:id/attempts', asyncHandler(bookingController.attempts));
 router.get('/:id/audit', asyncHandler(bookingController.audit));
 router.get('/:id/logs', asyncHandler(bookingController.logs));
 

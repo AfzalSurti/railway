@@ -1,6 +1,8 @@
 import { api } from './api';
 import type { ApiSuccess } from '../types/api';
 import type {
+  AuditEvent,
+  BookingAttempt,
   BookingInput,
   BookingTask,
   ExecutionLog,
@@ -69,6 +71,14 @@ export const bookingService = {
   },
   async tickets(id: string) {
     const { data } = await api.get<ApiSuccess<TicketArtifact[]>>(`/api/bookings/${id}/tickets`);
+    return data.data;
+  },
+  async attempts(id: string) {
+    const { data } = await api.get<ApiSuccess<BookingAttempt[]>>(`/api/bookings/${id}/attempts`);
+    return data.data;
+  },
+  async audit(id: string) {
+    const { data } = await api.get<ApiSuccess<AuditEvent[]>>(`/api/bookings/${id}/audit`);
     return data.data;
   },
   async downloadTicket(id: string, ticketId: string, fileName: string) {

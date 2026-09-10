@@ -4,6 +4,7 @@ import { humanActionService } from '../services/humanAction.service';
 import { paymentService } from '../services/payment.service';
 import { ticketService } from '../services/ticket.service';
 import { auditService } from '../observability/audit.service';
+import { bookingAttemptRepository } from '../repositories/bookingAttempt.repository';
 import { sendSuccess } from '../utils/apiResponse';
 import { getAuthenticatedUserId } from '../middleware/requireAuth';
 import { CreateBookingInput, UpdateBookingInput } from '../schemas/booking.schema';
@@ -144,6 +145,23 @@ export const bookingController = {
     res.setHeader('Content-Disposition', `attachment; filename="${ticket.fileName}"`);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(ticket.body);
+  },
+
+  async attempts(req: Request, res: Response): Promise<void> {
+    await bookingService.getById(getAuthenticatedUserId(req), req.params.id);
+    const rows = await bookingAttemptRepository.listByBooking(req.params.id);
+    sendSuccess(
+      res,
+      rows.map((attempt) => ({
+        id: attempt.id,
+        attemptNumber: attempt.attemptNumber,
+        status: attempt.status,
+        startedAt: attempt.startedAt,
+        endedAt: attempt.endedAt,
+        failureCode: attempt.failureCode,
+        failureReason: attempt.failureReason,
+      })),
+    );
   },
 
   async audit(req: Request, res: Response): Promise<void> {

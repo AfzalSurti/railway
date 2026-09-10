@@ -116,3 +116,21 @@ export type TicketArtifact = {
   sizeBytes: number;
   createdAt: string;
 };
+
+export type BookingAttempt = {
+  id: string;
+  attemptNumber: number;
+  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  startedAt: string;
+  endedAt: string | null;
+  failureCode: string | null;
+  failureReason: string | null;
+};
+
+export type AuditEvent = {
+  id: string;
+  action: string;
+  provider: string | null;
+  result: string | null;
+  createdAt: string;
+};
