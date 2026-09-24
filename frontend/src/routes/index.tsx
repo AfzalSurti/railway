@@ -10,6 +10,8 @@ import { BookingsPage } from '../pages/BookingsPage';
 import { NewBookingPage } from '../pages/NewBookingPage';
 import { BookingDetailPage } from '../pages/BookingDetailPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { AssistantPage } from '../pages/AssistantPage';
+import { PublicLayout } from '../layouts/PublicLayout';
 
 export function AppRouter() {
   return (
@@ -23,6 +25,7 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
+          <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/passengers" element={<PassengersPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
@@ -32,7 +35,9 @@ export function AppRouter() {
         </Route>
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<AssistantPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

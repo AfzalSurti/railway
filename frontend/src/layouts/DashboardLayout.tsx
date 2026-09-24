@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { classNames } from '../utils/format';
 
 const nav = [
+  { to: '/assistant', label: 'Find travel' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/bookings', label: 'Bookings' },
   { to: '/passengers', label: 'Passengers' },

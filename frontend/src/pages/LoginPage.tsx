@@ -35,7 +35,7 @@ export function LoginPage() {
           try {
             await login(values.email, values.password);
             notify({ variant: 'success', title: 'Signed in' });
-            navigate('/dashboard');
+            navigate('/assistant');
           } catch (error) {
             notify({ variant: 'error', title: 'Login failed', message: getApiErrorMessage(error) });
           }

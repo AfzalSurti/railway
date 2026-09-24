@@ -7,7 +7,20 @@ import { closeLockClient } from './queue/booking-lock';
 import { logger } from './utils/logger';
 
 async function start(): Promise<void> {
-  await connectDatabase();
+  try {
+    await connectDatabase();
+  } catch (error) {
+    if (env.NODE_ENV === 'production') {
+      throw error;
+    }
+    // Dev convenience: keep the API (and the DB-free travel search) up when the
+    // database is temporarily unreachable; DB-backed routes will error until it is back.
+    logger.warn('Database unreachable at startup; continuing in development mode', {
+      service: 'api',
+      event: 'DB_UNREACHABLE_AT_STARTUP',
+      message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+    });
+  }
   const server = app.listen(env.PORT, () => {
     logger.info(`API listening on port ${env.PORT}`, {
       service: 'api',

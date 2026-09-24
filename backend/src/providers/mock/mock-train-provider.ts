@@ -31,6 +31,7 @@ import {
   TicketDownloadResult,
 } from '../provider.types';
 import { sleep } from '../../utils/time';
+import { generateOptions } from './mock-inventory';
 
 const ALLOWED_OUTCOMES: MockExecutorOutcome[] = [
   'SUCCESS',
@@ -108,6 +109,17 @@ export class MockTrainProvider extends BaseTravelProvider {
   }
 
   async search(request: SearchRequest, context: ProviderContext): Promise<SearchResult> {
+    // No specific train requested (e.g. the travel assistant browsing a route):
+    // return a dynamic, deterministic timetable for that route and date.
+    if (!request.trainNumber && !context.trainNumber) {
+      const journeys = generateOptions('TRAIN', {
+        source: request.source,
+        destination: request.destination,
+        journeyDate: request.journeyDate,
+      });
+      return { found: journeys.length > 0, journeys };
+    }
+
     await this.pause();
     const outcome = resolveOutcome(context.mockOutcome);
     this.throwIfEarlyFailure(outcome, 'search');

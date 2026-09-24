@@ -68,6 +68,10 @@ const envSchema = z.object({
   TICKET_MAX_BYTES: z.coerce.number().int().min(1024).default(10 * 1024 * 1024),
   HUMAN_ACTION_TTL_MS: z.coerce.number().int().min(60_000).default(30 * 60 * 1000),
   METRICS_ENABLED: booleanFromEnv,
+  ANTHROPIC_API_KEY: z.string().default(''),
+  ASSISTANT_MODEL: z.string().min(1).default('claude-opus-5'),
+  ASSISTANT_LLM_ENABLED: booleanFromEnv,
+  ASSISTANT_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -86,6 +90,7 @@ export const env = {
   BROWSER_TRACE: data.BROWSER_TRACE ?? data.NODE_ENV !== 'production',
   PROVIDER_RECONCILE_ENABLED: data.PROVIDER_RECONCILE_ENABLED ?? true,
   METRICS_ENABLED: data.METRICS_ENABLED ?? true,
+  ASSISTANT_LLM_ENABLED: data.ASSISTANT_LLM_ENABLED ?? true,
 };
 
 export type MockExecutorOutcome = z.infer<typeof mockOutcomeSchema>;

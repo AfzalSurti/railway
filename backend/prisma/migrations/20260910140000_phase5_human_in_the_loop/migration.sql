@@ -1,3 +1,4 @@
+
 -- Phase 5: human-in-the-loop + provider session abstraction.
 
 CREATE TYPE "HumanActionType" AS ENUM ('LOGIN', 'OTP', 'CAPTCHA', 'PAYMENT', 'CONFIRMATION', 'MANUAL_REVIEW');

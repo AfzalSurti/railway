@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
@@ -37,6 +37,7 @@ export function NewBookingPage() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { notify } = useToast();
   const {
     register,
@@ -46,9 +47,17 @@ export function NewBookingPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    // The travel assistant links here with the chosen option pre-filled.
     defaultValues: {
-      serviceType: 'TRAIN',
-      provider: 'MOCK',
+      serviceType: (['TRAIN', 'BUS', 'FLIGHT'].includes(params.get('serviceType') ?? '')
+        ? params.get('serviceType')
+        : 'TRAIN') as ServiceType,
+      provider: params.get('provider') ?? 'MOCK',
+      source: params.get('source') ?? '',
+      destination: params.get('destination') ?? '',
+      journeyDate: params.get('journeyDate') ?? '',
+      trainNumber: params.get('trainNumber') ?? '',
+      travelClass: params.get('travelClass') ?? '',
       passengerIds: [],
     },
   });
@@ -145,13 +154,13 @@ export function NewBookingPage() {
                 CAPTCHA, and payment are not implemented.
               </p>
             ) : null}
-            {serviceType === 'TRAIN' ? (
-              <>
-                <Input label="Train Number" placeholder="20902" {...register('trainNumber')} />
-                <Input label="Class" placeholder="3A" {...register('travelClass')} />
-                <Input label="Quota" placeholder="GENERAL" {...register('quota')} />
-              </>
-            ) : null}
+            <Input
+              label={serviceType === 'TRAIN' ? 'Train Number' : serviceType === 'BUS' ? 'Bus Number' : 'Flight Number'}
+              placeholder={serviceType === 'TRAIN' ? '20902' : serviceType === 'BUS' ? 'BUS-1234' : '6E-234'}
+              {...register('trainNumber')}
+            />
+            <Input label="Class" placeholder={serviceType === 'TRAIN' ? '3A' : 'Economy'} {...register('travelClass')} />
+            {serviceType === 'TRAIN' ? <Input label="Quota" placeholder="GENERAL" {...register('quota')} /> : null}
           </div>
 
           <div>

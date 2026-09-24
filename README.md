@@ -9,6 +9,15 @@ payment authentication — those stay with the human.
 The AI agent / LLM orchestration layer is **not built yet** (a later phase).
 Everything here is the deterministic backend it will call.
 
+## Travel assistant (one-box search)
+
+`/` (public) and `/assistant` (logged in) show a single box: type *"train from Vadodara to Mumbai on 28 August between 6 and 8 AM"* (or a bus / flight). The assistant fills in what it understood, **asks for whatever is missing** (service, from, to, date, time window), then lists matching options from every available provider.
+
+- `POST /api/assistant/search` `{ message, draft?, awaiting? }` → `NEEDS_INFO` (question + quick replies) or `RESULTS`. Stateless: the client echoes the `draft` back each turn; nothing is written to the database. Public + rate-limited.
+- Understanding is a deterministic rule-based parser (relative dates, `between 6 and 8 am`, `evening`, city aliases, typos). Set `ANTHROPIC_API_KEY` to additionally use Claude (`ASSISTANT_MODEL`, default `claude-opus-5`) for free-form phrasing — its output is an untrusted, Zod-validated set of slot values only; it has no tools and no database, provider, or browser access.
+- Results are dynamic: every provider registered for the service type is queried through `TravelProvider.search()`. The `MOCK` provider now serves TRAIN, BUS and FLIGHT with deterministic, route-aware timetables and fares. Add a real provider and it shows up automatically.
+- "Schedule booking" on a result pre-fills the booking form.
+
 ## Stack
 
 - Frontend: React, TypeScript, Vite, TailwindCSS, React Router, Axios, React Hook Form, Zod

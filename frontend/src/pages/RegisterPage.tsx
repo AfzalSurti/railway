@@ -48,7 +48,7 @@ export function RegisterPage() {
               password: values.password,
             });
             notify({ variant: 'success', title: 'Registration successful' });
-            navigate('/dashboard');
+            navigate('/assistant');
           } catch (error) {
             notify({
               variant: 'error',

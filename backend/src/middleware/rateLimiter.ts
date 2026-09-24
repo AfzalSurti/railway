@@ -16,3 +16,19 @@ export const authRateLimiter = rateLimit({
     },
   },
 });
+
+export const assistantRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  skip: () => env.NODE_ENV === 'test' || Boolean(process.env.VITEST),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'You are searching too quickly. Please wait a moment.',
+      details: [],
+    },
+  },
+});

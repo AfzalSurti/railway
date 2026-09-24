@@ -91,6 +91,13 @@ export type SearchRequest = {
   quota?: string;
 };
 
+export type ClassOption = {
+  name: string;
+  /** Fare in minor currency units (paise). */
+  fareMinor: number;
+  seatsLeft: number;
+};
+
 export type JourneyOption = {
   providerTrainId: string;
   trainNumber: string;
@@ -100,6 +107,13 @@ export type JourneyOption = {
   departureTime: string;
   arrivalTime: string;
   classes: string[];
+  /** Optional richer data used by the travel assistant (search across TRAIN / BUS / FLIGHT). */
+  serviceType?: ServiceType;
+  operator?: string;
+  durationMinutes?: number;
+  arrivalDayOffset?: number;
+  currency?: string;
+  classOptions?: ClassOption[];
 };
 
 export type SearchResult = {
