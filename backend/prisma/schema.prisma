@@ -97,6 +97,29 @@ model User {
   passengers       Passenger[]
   bookingTasks     BookingTask[]
   providerSessions ProviderSession[]
+  paymentMethods   PaymentMethod[]
+}
+
+// A saved payment method reference. NEVER the full card number, expiry, or
+// CVV — those are never sent to or accepted by this API. Only a display
+// label + card brand + last 4 digits are stored, exactly like a real
+// tokenized "saved card" (the token itself would live with a real payment
+// gateway; this project only has the mock gateway, so there is no token).
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  userId    String
+  label     String
+  brand     String
+  last4     String
+  // At most one method per user has autoPay = true (enforced in the service).
+  // When true, a PAYMENT_REQUIRED pause is authorized automatically instead
+  // of waiting for the user to click "Authorize payment".
+  autoPay   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Passenger {

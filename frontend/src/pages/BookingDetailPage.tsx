@@ -145,6 +145,14 @@ export function BookingDetailPage() {
 
   return (
     <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/bookings'))}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
+      >
+        <span aria-hidden="true">←</span> Back
+      </button>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">{booking.serviceType}</p>

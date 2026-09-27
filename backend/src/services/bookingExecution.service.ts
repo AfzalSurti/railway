@@ -8,6 +8,7 @@ import { actionTypeForOutcome } from '../execution/provider-result-mapper';
 import { transitionBookingState } from '../execution/booking-state-machine';
 import { humanActionService, toHumanActionType } from './humanAction.service';
 import { paymentService } from './payment.service';
+import { paymentMethodRepository } from '../repositories/paymentMethod.repository';
 import { auditService } from '../observability/audit.service';
 import { incr } from '../observability/metrics';
 import { BookingExecutionJob, isRetryableFailureCode } from '../queue/queue.types';
@@ -178,6 +179,11 @@ export const bookingExecutionService = {
           actionRequired: false,
           actionRequiredType: 'NONE',
           actionRequiredMessage: null,
+          // Clears any failureCode/failureReason left over from an earlier
+          // retried attempt (or, for the auto-pay path above, from the
+          // PAYMENT_REQUIRED pause this booking just came from).
+          failureCode: null,
+          failureReason: null,
           currentStage: 'BOOKING_CONFIRMED',
           providerStatus: 'AVAILABLE',
         });
@@ -230,12 +236,6 @@ export const bookingExecutionService = {
     }
 
     if (result.outcome === 'PAYMENT_REQUIRED') {
-      await bookingAttemptRepository.update(attempt.id, {
-        status: AttemptStatus.FAILED,
-        endedAt: new Date(),
-        failureCode: result.failureCode,
-        failureReason: result.failureReason,
-      });
       await transitionBookingState(bookingTaskId, BookingStatus.PAYMENT_REQUIRED, {
         failureCode: result.failureCode,
         failureReason: result.failureReason,
@@ -246,13 +246,56 @@ export const bookingExecutionService = {
         currentStage: 'PAYMENT_REQUIRED',
       });
       await paymentService.requirePayment({ bookingTaskId, description: result.failureReason });
+      incr('booking_payment_required_total');
+      await auditService.record({ ...auditBase, action: 'PAYMENT_REQUIRED' });
+
+      // Auto-pay: only if the user has explicitly saved a payment method and
+      // marked it for auto-pay. This is standing consent given ahead of time
+      // when the method was saved — not a bypass of authorization — and it
+      // only ever calls the same authorize() a human would use by hand.
+      const autoPayMethod = await paymentMethodRepository.findAutoPay(booking.userId);
+      if (autoPayMethod) {
+        const authorized = await paymentService.authorize(booking.userId, bookingTaskId);
+        if (authorized.status === 'SUCCESS') {
+          await bookingAttemptRepository.update(attempt.id, { status: AttemptStatus.SUCCESS, endedAt: new Date() });
+          await auditService.record({
+            ...auditBase,
+            action: 'PAYMENT_AUTO_AUTHORIZED',
+            metadata: { paymentMethodId: autoPayMethod.id },
+          });
+          const bookingReference = `MOCK-AUTO-${Date.now()}`;
+          await transitionBookingState(bookingTaskId, BookingStatus.COMPLETED, {
+            completedAt: new Date(),
+            bookingReference,
+            message: 'Payment authorized automatically via saved payment method; booking confirmed',
+            metadata: { bookingReference, autoPay: true },
+            actionRequired: false,
+            actionRequiredType: 'NONE',
+            actionRequiredMessage: null,
+            failureCode: null,
+            failureReason: null,
+            currentStage: 'BOOKING_CONFIRMED',
+            providerStatus: 'AVAILABLE',
+          });
+          incr('booking_success_total');
+          await auditService.record({ ...auditBase, action: 'BOOKING_COMPLETED', result: 'AUTO_PAY' });
+          return;
+        }
+        // Auto-pay attempt failed (e.g. the mock provider declined it) — fall
+        // through to the normal human-in-the-loop pause below.
+      }
+
+      await bookingAttemptRepository.update(attempt.id, {
+        status: AttemptStatus.FAILED,
+        endedAt: new Date(),
+        failureCode: result.failureCode,
+        failureReason: result.failureReason,
+      });
       await humanActionService.createForBooking({
         bookingTaskId,
         type: 'PAYMENT',
         message: result.failureReason,
       });
-      incr('booking_payment_required_total');
-      await auditService.record({ ...auditBase, action: 'PAYMENT_REQUIRED' });
       throw new UnrecoverableError(result.failureReason);
     }
 

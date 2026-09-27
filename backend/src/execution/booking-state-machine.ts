@@ -17,7 +17,15 @@ const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
     BookingStatus.QUEUED,
   ],
   AUTHENTICATION_REQUIRED: [BookingStatus.QUEUED, BookingStatus.RUNNING, BookingStatus.FAILED, BookingStatus.CANCELLED],
-  PAYMENT_REQUIRED: [BookingStatus.QUEUED, BookingStatus.RUNNING, BookingStatus.FAILED, BookingStatus.CANCELLED],
+  // COMPLETED here is only for an auto-pay method authorizing instantly
+  // (see bookingExecution.service.ts) — never a bypass of a human payment.
+  PAYMENT_REQUIRED: [
+    BookingStatus.QUEUED,
+    BookingStatus.RUNNING,
+    BookingStatus.COMPLETED,
+    BookingStatus.FAILED,
+    BookingStatus.CANCELLED,
+  ],
   UNKNOWN_RESULT: [
     BookingStatus.QUEUED,
     BookingStatus.COMPLETED,

@@ -22,6 +22,9 @@ export const AUDIT_ACTIONS = [
   'HUMAN_ACTION_CREATED',
   'HUMAN_ACTION_RESOLVED',
   'TICKET_STORED',
+  'PAYMENT_METHOD_ADDED',
+  'PAYMENT_METHOD_REMOVED',
+  'PAYMENT_AUTO_AUTHORIZED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

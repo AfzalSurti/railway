@@ -35,4 +35,10 @@ describe('Booking state machine', () => {
     // never straight back to RUNNING without an explicit human requeue
     expect(canTransition(BookingStatus.UNKNOWN_RESULT, BookingStatus.RUNNING)).toBe(false);
   });
+
+  it('allows PAYMENT_REQUIRED -> COMPLETED only for an instant auto-pay authorization', () => {
+    expect(canTransition(BookingStatus.PAYMENT_REQUIRED, BookingStatus.COMPLETED)).toBe(true);
+    // still never a direct bypass of the human-in-the-loop pause for auth
+    expect(canTransition(BookingStatus.AUTHENTICATION_REQUIRED, BookingStatus.COMPLETED)).toBe(false);
+  });
 });

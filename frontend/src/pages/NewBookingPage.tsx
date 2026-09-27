@@ -23,7 +23,9 @@ const schema = z.object({
   source: z.string().min(1, 'Source is required'),
   destination: z.string().min(1, 'Destination is required'),
   journeyDate: z.string().min(1, 'Journey date is required'),
-  scheduledAt: z.string().min(1, 'Scheduled time is required'),
+  // Required only when "Schedule for later" is selected (checked at submit time) —
+  // "Book now" fills this in automatically.
+  scheduledAt: z.string().optional(),
   trainNumber: z.string().optional(),
   travelClass: z.string().optional(),
   quota: z.string().optional(),
@@ -36,6 +38,7 @@ export function NewBookingPage() {
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookNow, setBookNow] = useState(true);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { notify } = useToast();
@@ -99,21 +102,61 @@ export function NewBookingPage() {
         <form
           className="space-y-5"
           onSubmit={handleSubmit(async (values) => {
+            if (!bookNow && !values.scheduledAt) {
+              notify({ variant: 'error', title: 'Pick a scheduled time', message: 'Or switch to "Book now".' });
+              return;
+            }
             try {
               const created = await bookingService.create({
                 ...values,
                 serviceType: values.serviceType as ServiceType,
                 source: values.source.toUpperCase(),
                 destination: values.destination.toUpperCase(),
-                scheduledAt: new Date(values.scheduledAt).toISOString(),
+                // "Book now" schedules a few seconds out so it is picked up
+                // immediately instead of sitting as an unqueued draft.
+                scheduledAt: bookNow
+                  ? new Date(Date.now() + 5000).toISOString()
+                  : new Date(values.scheduledAt as string).toISOString(),
               });
-              notify({ variant: 'success', title: 'Booking task scheduled' });
+              notify({
+                variant: 'success',
+                title: bookNow ? 'Booking is running now' : 'Booking task scheduled',
+              });
               navigate(`/bookings/${created.id}`);
             } catch (error) {
               notify({ variant: 'error', title: 'Could not schedule booking', message: getApiErrorMessage(error) });
             }
           })}
         >
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700">When</p>
+            <div className="inline-flex rounded-xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setBookNow(true)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  bookNow ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Book now
+              </button>
+              <button
+                type="button"
+                onClick={() => setBookNow(false)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  !bookNow ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Schedule for later
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {bookNow
+                ? 'Execution starts right away — no ticket is actually purchased in this phase.'
+                : 'Pick a future date and time; the worker will pick it up automatically then.'}
+            </p>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Select label="Service" error={errors.serviceType?.message} {...register('serviceType')}>
               <option value="TRAIN">TRAIN</option>
@@ -142,12 +185,14 @@ export function NewBookingPage() {
               {...register('destination')}
             />
             <Input label="Journey Date" type="date" error={errors.journeyDate?.message} {...register('journeyDate')} />
-            <Input
-              label="Scheduled Time"
-              type="datetime-local"
-              error={errors.scheduledAt?.message}
-              {...register('scheduledAt')}
-            />
+            {bookNow ? null : (
+              <Input
+                label="Scheduled Time"
+                type="datetime-local"
+                error={errors.scheduledAt?.message}
+                {...register('scheduledAt')}
+              />
+            )}
             {serviceType === 'TRAIN' && selectedProvider === 'IRCTC' ? (
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:col-span-2">
                 IRCTC integration is coming soon. This only creates a booking task. Real ticket booking, login, OTP,
@@ -204,7 +249,7 @@ export function NewBookingPage() {
 
           <div className="flex justify-end">
             <Button type="submit" loading={isSubmitting}>
-              Schedule Booking
+              {bookNow ? 'Book Now' : 'Schedule Booking'}
             </Button>
           </div>
         </form>
