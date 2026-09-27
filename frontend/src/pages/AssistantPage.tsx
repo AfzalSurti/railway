@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { assistantService } from '../services/assistant.service';
 import { getApiErrorMessage } from '../services/api';
-import type { AssistantDraft, AssistantSlot, TravelOption } from '../types/assistant';
+import type { AssistantDraft, AssistantSlot, ProcessStep, TravelOption } from '../types/assistant';
 
 type ChatItem = {
   id: number;
@@ -13,6 +13,7 @@ type ChatItem = {
   outsideWindow?: boolean;
   draft?: AssistantDraft;
   quickReplies?: string[];
+  steps?: ProcessStep[];
   error?: boolean;
 };
 
@@ -254,6 +255,53 @@ function JourneyDetailsModal({
   );
 }
 
+const STEP_DOT: Record<ProcessStep['status'], string> = {
+  done: 'bg-emerald-500 text-white',
+  warning: 'bg-amber-500 text-white',
+  info: 'bg-slate-300 text-white',
+};
+const STEP_MARK: Record<ProcessStep['status'], string> = { done: '✓', warning: '!', info: '·' };
+
+/** A collapsed-by-default "how I found this" trace, in the same spirit as Claude's step disclosures. */
+function ProcessTrace({ steps }: { steps: ProcessStep[] }) {
+  const [open, setOpen] = useState(false);
+  const warnings = steps.filter((step) => step.status === 'warning').length;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-100 hover:text-slate-700"
+      >
+        <span className={`inline-block text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        {open ? 'Hide' : 'Show'} how I found this
+        <span className="text-slate-400">
+          · {steps.length} step{steps.length === 1 ? '' : 's'}
+          {warnings > 0 ? ` · ${warnings} note${warnings === 1 ? '' : 's'}` : ''}
+        </span>
+      </button>
+      {open ? (
+        <ol className="mt-2 max-w-[85%] space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          {steps.map((step, index) => (
+            <li key={index} className="flex items-start gap-2 text-xs leading-relaxed">
+              <span
+                className={`mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] ${STEP_DOT[step.status]}`}
+              >
+                {STEP_MARK[step.status]}
+              </span>
+              <span>
+                <span className="font-medium text-slate-700">{step.label}</span>
+                {step.detail ? <span className="text-slate-500"> — {step.detail}</span> : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
 export function AssistantPage() {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [draft, setDraft] = useState<AssistantDraft>({});
@@ -282,7 +330,13 @@ export function AssistantPage() {
         setAwaiting(response.awaiting);
         setItems((prev) => [
           ...prev,
-          { id: nextId.current++, role: 'assistant', text: response.reply, quickReplies: response.quickReplies },
+          {
+            id: nextId.current++,
+            role: 'assistant',
+            text: response.reply,
+            quickReplies: response.quickReplies,
+            steps: response.steps,
+          },
         ]);
       } else {
         setAwaiting(null);
@@ -295,6 +349,7 @@ export function AssistantPage() {
             results: response.results,
             outsideWindow: response.outsideWindow,
             draft: response.draft,
+            steps: response.steps,
           },
         ]);
       }
@@ -383,6 +438,7 @@ export function AssistantPage() {
               >
                 {item.text}
               </div>
+              {item.steps && item.steps.length > 0 ? <ProcessTrace steps={item.steps} /> : null}
               {item.quickReplies && item.quickReplies.length > 0 && item.id === lastId ? (
                 <div className="flex flex-wrap gap-2">
                   {item.quickReplies.map((reply) => (

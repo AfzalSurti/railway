@@ -32,6 +32,12 @@ export type TravelOption = {
   classes: Array<{ name: string; fareMinor: number; seatsLeft: number }>;
 };
 
+export type ProcessStep = {
+  label: string;
+  detail?: string;
+  status: 'done' | 'info' | 'warning';
+};
+
 export type AssistantResponse =
   | {
       status: 'NEEDS_INFO';
@@ -40,6 +46,7 @@ export type AssistantResponse =
       awaiting: AssistantSlot;
       missing: AssistantSlot[];
       quickReplies: string[];
+      steps: ProcessStep[];
     }
   | {
       status: 'RESULTS';
@@ -48,4 +55,5 @@ export type AssistantResponse =
       results: TravelOption[];
       outsideWindow: boolean;
       providers: string[];
+      steps: ProcessStep[];
     };

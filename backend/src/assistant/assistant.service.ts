@@ -32,6 +32,13 @@ export type AssistantInput = {
   awaiting?: Slot | null;
 };
 
+/** One line of the "how I found this" trace shown in the UI, expandable per turn. */
+export type ProcessStep = {
+  label: string;
+  detail?: string;
+  status: 'done' | 'info' | 'warning';
+};
+
 export type AssistantResponse =
   | {
       status: 'NEEDS_INFO';
@@ -40,6 +47,7 @@ export type AssistantResponse =
       awaiting: Slot;
       missing: Slot[];
       quickReplies: string[];
+      steps: ProcessStep[];
     }
   | {
       status: 'RESULTS';
@@ -49,6 +57,7 @@ export type AssistantResponse =
       /** True when nothing fell inside the requested time window and the closest departures are shown instead. */
       outsideWindow: boolean;
       providers: string[];
+      steps: ProcessStep[];
     };
 
 const SERVICE_LABEL: Record<ServiceType, { one: string; many: string; title: string }> = {
@@ -120,7 +129,12 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-function needsInfo(draft: Draft, missing: Slot[], notices: string[]): AssistantResponse {
+function needsInfo(
+  draft: Draft,
+  missing: Slot[],
+  notices: string[],
+  steps: ProcessStep[],
+): AssistantResponse {
   const first = missing[0];
   const known = describeDraft(draft);
   const pieces: string[] = [...notices];
@@ -129,6 +143,11 @@ function needsInfo(draft: Draft, missing: Slot[], notices: string[]): AssistantR
     pieces.push(`I still need ${joinList(missing.map((slot) => PROMPTS[slot].short))}.`);
   }
   pieces.push(PROMPTS[first].question);
+  steps.push({
+    label: 'Checked what is still missing',
+    detail: `Still need: ${joinList(missing.map((slot) => PROMPTS[slot].short))}`,
+    status: 'info',
+  });
   return {
     status: 'NEEDS_INFO',
     reply: pieces.join(' '),
@@ -136,6 +155,7 @@ function needsInfo(draft: Draft, missing: Slot[], notices: string[]): AssistantR
     awaiting: first,
     missing,
     quickReplies: PROMPTS[first].quick,
+    steps,
   };
 }
 
@@ -196,12 +216,27 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
   const source = resolvePlace(draft.source as string, serviceType);
   const destination = resolvePlace(draft.destination as string, serviceType);
   const label = SERVICE_LABEL[serviceType];
+  const steps: ProcessStep[] = [];
+
+  steps.push({
+    label: 'Understood your request',
+    detail: describeDraft(draft),
+    status: 'done',
+  });
+  const withCode = (place: { name: string; code: string }) =>
+    place.code === place.name ? place.name : `${place.name} (${place.code})`;
+  steps.push({
+    label: 'Resolved the route',
+    detail: `${withCode(source)} → ${withCode(destination)}`,
+    status: 'done',
+  });
 
   const descriptors = providerFactory
     .list()
     .filter((descriptor) => descriptor.serviceType === serviceType && descriptor.available);
 
   if (descriptors.length === 0) {
+    steps.push({ label: `No ${label.one} provider is available`, status: 'warning' });
     return {
       status: 'RESULTS',
       reply: `No ${label.one} provider is available right now.`,
@@ -209,8 +244,14 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
       results: [],
       outsideWindow: false,
       providers: [],
+      steps,
     };
   }
+  steps.push({
+    label: `Found ${descriptors.length} ${label.one} provider${descriptors.length === 1 ? '' : 's'}`,
+    detail: descriptors.map((d) => d.name).join(', '),
+    status: 'done',
+  });
 
   const request: SearchRequest = {
     serviceType,
@@ -247,16 +288,23 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
   let options: TravelOption[] = [];
   const usedProviders: string[] = [];
   settled.forEach((entry, index) => {
+    const providerName = descriptors[index].name;
     if (entry.status === 'fulfilled') {
       options = options.concat(entry.value);
-      usedProviders.push(descriptors[index].name);
+      usedProviders.push(providerName);
+      steps.push({
+        label: `Searched ${providerName}`,
+        detail: `${entry.value.length} journey${entry.value.length === 1 ? '' : 's'} found`,
+        status: 'done',
+      });
     } else {
       logger.warn('Assistant provider search failed', {
         service: 'api',
         event: 'ASSISTANT_PROVIDER_FAILED',
-        provider: descriptors[index].name,
+        provider: providerName,
         message: entry.reason instanceof Error ? entry.reason.message.slice(0, 200) : 'unknown',
       });
+      steps.push({ label: `Searched ${providerName}`, detail: 'Unavailable, skipped', status: 'warning' });
     }
   });
 
@@ -272,12 +320,19 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
         const priced = option.classes.filter((entry) => entry.fareMinor > 0).map((entry) => entry.fareMinor);
         return { ...option, fromFareMinor: priced.length ? Math.min(...priced) : option.fromFareMinor };
       });
+      steps.push({ label: `Filtered to class “${wanted}”`, detail: `${options.length} match`, status: 'done' });
     } else {
       classNote = ` I couldn't find “${wanted}”, so I'm showing all classes.`;
+      steps.push({ label: `Filtered to class “${wanted}”`, detail: 'No match, showing all classes', status: 'warning' });
     }
   }
 
   options.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+  steps.push({
+    label: 'Sorted by departure time',
+    detail: `${options.length} total option${options.length === 1 ? '' : 's'}`,
+    status: 'done',
+  });
 
   let results = options;
   let outsideWindow = false;
@@ -292,7 +347,17 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
     windowText = ` departing between ${draft.timeFrom} and ${draft.timeTo}`;
     if (inside.length > 0) {
       results = inside;
+      steps.push({
+        label: `Matched your time window (${draft.timeFrom}–${draft.timeTo})`,
+        detail: `${inside.length} of ${options.length} options`,
+        status: 'done',
+      });
     } else if (options.length > 0) {
+      steps.push({
+        label: `No departures between ${draft.timeFrom} and ${draft.timeTo}`,
+        detail: 'Showing the 5 closest departures instead',
+        status: 'warning',
+      });
       const centre = (from + to) / 2;
       results = [...options]
         .sort((a, b) => Math.abs(toMinutes(a.departureTime) - centre) - Math.abs(toMinutes(b.departureTime) - centre))
@@ -307,8 +372,10 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
   let reply: string;
   if (results.length === 0) {
     reply = `I couldn't find any ${label.many} from ${route}. Try another date or route.`;
+    steps.push({ label: 'No results', status: 'warning' });
   } else if (outsideWindow) {
     reply = `No ${label.many} from ${route}${windowText}. Here are the closest departures instead.${classNote}`;
+    steps.push({ label: `Ready — ${results.length} closest option${results.length === 1 ? '' : 's'}`, status: 'done' });
   } else {
     const cheapest = [...results].filter((o) => o.fromFareMinor > 0).sort((a, b) => a.fromFareMinor - b.fromFareMinor)[0];
     const fastest = [...results].filter((o) => o.durationMinutes > 0).sort((a, b) => a.durationMinutes - b.durationMinutes)[0];
@@ -319,9 +386,14 @@ async function runSearch(draft: Draft, now: Date): Promise<AssistantResponse> {
       `I found ${results.length} ${results.length === 1 ? label.one : label.many} from ${route}${windowText}.` +
       (highlights.length ? ` (${highlights.join(', ')})` : '') +
       classNote;
+    steps.push({
+      label: `Ready — ${results.length} result${results.length === 1 ? '' : 's'}`,
+      detail: highlights.join(', ') || undefined,
+      status: 'done',
+    });
   }
 
-  return { status: 'RESULTS', reply, draft, results, outsideWindow, providers: usedProviders };
+  return { status: 'RESULTS', reply, draft, results, outsideWindow, providers: usedProviders, steps };
 }
 
 /**
@@ -337,23 +409,38 @@ export async function handleAssistantMessage(
   const awaiting = input.awaiting ?? null;
   const base: Draft = input.draft ?? {};
 
-  let draft = mergeDraft(base, parseMessage(input.message, awaiting, now));
+  const steps: ProcessStep[] = [];
+
+  const ruleParsed = parseMessage(input.message, awaiting, now);
+  steps.push({
+    label: 'Read your message',
+    detail: Object.keys(ruleParsed).length > 0 ? describeDraft(mergeDraft({}, ruleParsed)) : 'No new details found',
+    status: 'done',
+  });
+  let draft = mergeDraft(base, ruleParsed);
+
   const fromModel = await extractSlots(input.message, draft, awaiting, today);
-  if (fromModel) draft = mergeDraft(draft, fromModel);
+  if (fromModel && Object.keys(fromModel).length > 0) {
+    draft = mergeDraft(draft, fromModel);
+    steps.push({ label: 'AI understood a bit more', detail: describeDraft(mergeDraft({}, fromModel)), status: 'done' });
+  }
 
   const notices: string[] = [];
   if (draft.date && draft.date < today) {
     delete draft.date;
     notices.push('That date has already passed.');
+    steps.push({ label: 'That date has already passed', status: 'warning' });
   }
   if (draft.source && draft.destination && draft.source.toLowerCase() === draft.destination.toLowerCase()) {
     delete draft.destination;
     notices.push('The start and end can’t be the same place.');
+    steps.push({ label: 'Start and end can’t be the same place', status: 'warning' });
   }
 
   const missing = missingSlots(draft);
   if (missing.length > 0 || !isTimeKnown(draft)) {
-    return needsInfo(draft, missing.length ? missing : ['time'], notices);
+    return needsInfo(draft, missing.length ? missing : ['time'], notices, steps);
   }
-  return runSearch(draft, now);
+  const result = await runSearch(draft, now);
+  return { ...result, steps: [...steps, ...result.steps] };
 }

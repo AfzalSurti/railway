@@ -134,6 +134,32 @@ describe('assistant conversation', () => {
     }
   });
 
+  it('reports a step-by-step trace of how it found the results', async () => {
+    const res = await handleAssistantMessage(
+      { message: 'train from Vadodara to Mumbai on 28 August between 6 and 8 AM' },
+      NOW,
+    );
+    expect(res.status).toBe('RESULTS');
+    if (res.status !== 'RESULTS') return;
+    expect(res.steps.length).toBeGreaterThan(3);
+    const labels = res.steps.map((s) => s.label);
+    expect(labels).toContain('Read your message');
+    expect(labels.some((l) => l.startsWith('Searched MOCK'))).toBe(true);
+    expect(labels.some((l) => l.startsWith('Ready'))).toBe(true);
+    for (const step of res.steps) {
+      expect(['done', 'info', 'warning']).toContain(step.status);
+    }
+  });
+
+  it('the trace explains a missing-info turn too', async () => {
+    const res = await handleAssistantMessage({ message: 'train from Vadodara to Mumbai' }, NOW);
+    expect(res.status).toBe('NEEDS_INFO');
+    if (res.status !== 'NEEDS_INFO') return;
+    const labels = res.steps.map((s) => s.label);
+    expect(labels).toContain('Read your message');
+    expect(labels).toContain('Checked what is still missing');
+  });
+
   it('searches buses and flights dynamically for any route', async () => {
     const bus = await handleAssistantMessage({ message: 'bus from Surat to Pune on 30 August, any time' }, NOW);
     expect(bus.status).toBe('RESULTS');
