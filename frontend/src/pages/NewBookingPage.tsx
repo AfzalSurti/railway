@@ -13,7 +13,7 @@ import { bookingService } from '../services/booking.service';
 import { providerService } from '../services/provider.service';
 import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import type { Passenger } from '../types/passenger';
+import type { Gender, Passenger } from '../types/passenger';
 import type { ServiceType } from '../types/booking';
 import type { ProviderInfo } from '../types/provider';
 
@@ -39,6 +39,9 @@ export function NewBookingPage() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookNow, setBookNow] = useState(true);
+  const [showAddPassenger, setShowAddPassenger] = useState(false);
+  const [addingPassenger, setAddingPassenger] = useState(false);
+  const [newPassenger, setNewPassenger] = useState({ name: '', age: '', gender: 'MALE' as Gender, phone: '' });
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { notify } = useToast();
@@ -85,6 +88,32 @@ export function NewBookingPage() {
       setValue('provider', matches[0].name);
     }
   }, [providers, selectedProvider, serviceType, setValue]);
+
+  async function handleAddPassenger() {
+    const age = Number(newPassenger.age);
+    if (!newPassenger.name.trim() || !age || age < 1 || age > 120 || newPassenger.phone.trim().length < 8) {
+      notify({ variant: 'error', title: 'Fill in a valid name, age (1-120), and phone number' });
+      return;
+    }
+    setAddingPassenger(true);
+    try {
+      const created = await passengerService.create({
+        name: newPassenger.name.trim(),
+        age,
+        gender: newPassenger.gender,
+        phone: newPassenger.phone.trim(),
+      });
+      setPassengers((prev) => [...prev, created]);
+      setValue('passengerIds', [...selectedPassengers, created.id], { shouldValidate: true });
+      setNewPassenger({ name: '', age: '', gender: 'MALE', phone: '' });
+      setShowAddPassenger(false);
+      notify({ variant: 'success', title: `${created.name} added` });
+    } catch (error) {
+      notify({ variant: 'error', title: 'Could not add passenger', message: getApiErrorMessage(error) });
+    } finally {
+      setAddingPassenger(false);
+    }
+  }
 
   if (loading) {
     return <Spinner />;
@@ -211,7 +240,7 @@ export function NewBookingPage() {
           <div>
             <p className="mb-2 text-sm font-medium text-slate-700">Passengers</p>
             {passengers.length === 0 ? (
-              <p className="text-sm text-slate-500">Add a passenger before scheduling a booking.</p>
+              <p className="text-sm text-slate-500">No passengers yet — add one below.</p>
             ) : (
               <div className="space-y-2">
                 {passengers.map((passenger) => {
@@ -245,6 +274,55 @@ export function NewBookingPage() {
             {errors.passengerIds ? (
               <p className="mt-2 text-xs text-rose-600">{errors.passengerIds.message}</p>
             ) : null}
+
+            {showAddPassenger ? (
+              <div className="mt-3 space-y-3 rounded-xl border border-dashed border-slate-300 p-4">
+                <p className="text-sm font-medium text-slate-700">Add a new passenger</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label="Name"
+                    value={newPassenger.name}
+                    onChange={(event) => setNewPassenger((prev) => ({ ...prev, name: event.target.value }))}
+                  />
+                  <Input
+                    label="Age"
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={newPassenger.age}
+                    onChange={(event) => setNewPassenger((prev) => ({ ...prev, age: event.target.value }))}
+                  />
+                  <Select
+                    label="Gender"
+                    value={newPassenger.gender}
+                    onChange={(event) =>
+                      setNewPassenger((prev) => ({ ...prev, gender: event.target.value as Gender }))
+                    }
+                  >
+                    <option value="MALE">MALE</option>
+                    <option value="FEMALE">FEMALE</option>
+                    <option value="OTHER">OTHER</option>
+                  </Select>
+                  <Input
+                    label="Phone"
+                    value={newPassenger.phone}
+                    onChange={(event) => setNewPassenger((prev) => ({ ...prev, phone: event.target.value }))}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="secondary" onClick={() => setShowAddPassenger(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" loading={addingPassenger} onClick={handleAddPassenger}>
+                    Add passenger
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button type="button" variant="secondary" className="mt-3" onClick={() => setShowAddPassenger(true)}>
+                + Add new passenger
+              </Button>
+            )}
           </div>
 
           <div className="flex justify-end">
