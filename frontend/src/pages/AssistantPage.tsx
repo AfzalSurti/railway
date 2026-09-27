@@ -48,26 +48,46 @@ function summary(draft: AssistantDraft): string[] {
   return parts;
 }
 
-function OptionCard({ option, draft }: { option: TravelOption; draft: AssistantDraft }) {
-  const navigate = useNavigate();
+function cheapestOpenClass(option: TravelOption) {
   const open = option.classes.filter((c) => c.seatsLeft > 0);
-  const chosen = [...open].sort((a, b) => a.fareMinor - b.fareMinor)[0] ?? option.classes[0];
+  return [...open].sort((a, b) => a.fareMinor - b.fareMinor)[0] ?? option.classes[0];
+}
 
-  function schedule() {
-    const query = new URLSearchParams({
-      serviceType: option.serviceType,
-      provider: option.provider,
-      source: option.source.code,
-      destination: option.destination.code,
-      journeyDate: draft.date ?? '',
-      trainNumber: option.number,
-      travelClass: chosen?.name ?? '',
-    });
-    navigate(`/bookings/new?${query.toString()}`);
-  }
+function scheduleUrl(option: TravelOption, draft: AssistantDraft): string {
+  const chosen = cheapestOpenClass(option);
+  const query = new URLSearchParams({
+    serviceType: option.serviceType,
+    provider: option.provider,
+    source: option.source.code,
+    destination: option.destination.code,
+    journeyDate: draft.date ?? '',
+    trainNumber: option.number,
+    travelClass: chosen?.name ?? '',
+  });
+  return `/bookings/new?${query.toString()}`;
+}
+
+function OptionCard({
+  option,
+  draft,
+  onOpenDetails,
+}: {
+  option: TravelOption;
+  draft: AssistantDraft;
+  onOpenDetails: () => void;
+}) {
+  const navigate = useNavigate();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-300">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpenDetails}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') onOpenDetails();
+      }}
+      className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[220px] flex-1">
           <div className="flex items-baseline gap-3">
@@ -93,7 +113,13 @@ function OptionCard({ option, draft }: { option: TravelOption; draft: AssistantD
         <div className="text-right">
           <p className="text-xs uppercase tracking-wide text-slate-400">from</p>
           <p className="text-xl font-bold text-slate-900">{money(option.fromFareMinor, option.currency)}</p>
-          <Button className="mt-2" onClick={schedule}>
+          <Button
+            className="mt-2"
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(scheduleUrl(option, draft));
+            }}
+          >
             Schedule booking
           </Button>
         </div>
@@ -110,6 +136,120 @@ function OptionCard({ option, draft }: { option: TravelOption; draft: AssistantD
           </span>
         ))}
       </div>
+      <p className="mt-3 text-xs font-medium text-brand-600">Tap for full details →</p>
+    </div>
+  );
+}
+
+function JourneyDetailsModal({
+  option,
+  draft,
+  onClose,
+}: {
+  option: TravelOption;
+  draft: AssistantDraft;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const dateLabel = (() => {
+    if (!draft.date) return null;
+    const [y, m, d] = draft.date.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  })();
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+              {TYPE_ICON[option.serviceType]} {option.serviceType}
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">{option.name}</h2>
+            <p className="text-sm text-slate-500">
+              {option.number} · {option.operator} · {option.provider}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Departs</p>
+            <p className="text-lg font-bold text-slate-900">{option.departureTime}</p>
+            <p className="text-sm text-slate-600">
+              {option.source.name} ({option.source.code})
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Arrives</p>
+            <p className="text-lg font-bold text-slate-900">
+              {option.arrivalTime}
+              {option.arrivalDayOffset > 0 ? (
+                <sup className="ml-0.5 text-xs font-semibold text-amber-600">+{option.arrivalDayOffset}d</sup>
+              ) : null}
+            </p>
+            <p className="text-sm text-slate-600">
+              {option.destination.name} ({option.destination.code})
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Duration</p>
+            <p className="text-sm font-medium text-slate-900">{duration(option.durationMinutes)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Date</p>
+            <p className="text-sm font-medium text-slate-900">{dateLabel ?? '—'}</p>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <p className="text-sm font-semibold text-slate-700">Classes &amp; fares</p>
+          <div className="mt-2 space-y-2">
+            {option.classes.map((c) => (
+              <div
+                key={c.name}
+                className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5"
+              >
+                <span className="text-sm font-medium text-slate-800">{c.name}</span>
+                <span className="text-sm text-slate-500">
+                  {c.seatsLeft > 0 ? `${c.seatsLeft} seats left` : 'Sold out'}
+                </span>
+                <span className="text-sm font-semibold text-slate-900">{money(c.fareMinor, option.currency)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs text-slate-400">
+          Mock inventory for development — no real {option.serviceType.toLowerCase()} is booked.
+        </p>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={() => navigate(scheduleUrl(option, draft))}>Schedule booking</Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -120,6 +260,7 @@ export function AssistantPage() {
   const [awaiting, setAwaiting] = useState<AssistantSlot | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [detailOption, setDetailOption] = useState<{ option: TravelOption; draft: AssistantDraft } | null>(null);
   const nextId = useRef(1);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -263,7 +404,12 @@ export function AssistantPage() {
                     <p className="text-xs font-medium text-amber-700">Nothing in your time window — closest departures:</p>
                   ) : null}
                   {item.results.map((option) => (
-                    <OptionCard key={option.id} option={option} draft={item.draft as AssistantDraft} />
+                    <OptionCard
+                      key={option.id}
+                      option={option}
+                      draft={item.draft as AssistantDraft}
+                      onOpenDetails={() => setDetailOption({ option, draft: item.draft as AssistantDraft })}
+                    />
                   ))}
                 </div>
               ) : null}
@@ -300,6 +446,14 @@ export function AssistantPage() {
           Search
         </Button>
       </form>
+
+      {detailOption ? (
+        <JourneyDetailsModal
+          option={detailOption.option}
+          draft={detailOption.draft}
+          onClose={() => setDetailOption(null)}
+        />
+      ) : null}
     </div>
   );
 }

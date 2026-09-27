@@ -121,6 +121,13 @@ export function NewBookingPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <button
+        type="button"
+        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/bookings'))}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
+      >
+        <span aria-hidden="true">←</span> Back
+      </button>
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Schedule a booking</h1>
         <p className="mt-1 text-sm text-slate-500">
