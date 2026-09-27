@@ -72,6 +72,11 @@ const envSchema = z.object({
   ASSISTANT_MODEL: z.string().min(1).default('claude-opus-5'),
   ASSISTANT_LLM_ENABLED: booleanFromEnv,
   ASSISTANT_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
+  // Alternative OpenAI-compatible provider (e.g. OpenRouter) for the same
+  // slot-extraction step. If set, it takes priority over ANTHROPIC_API_KEY.
+  AI_API_KEY: z.string().default(''),
+  MODEL_NAME: z.string().min(1).default('openai/gpt-4o-mini'),
+  AI_API_URL: z.string().default('https://openrouter.ai/api/v1/chat/completions'),
 });
 
 const parsed = envSchema.safeParse(process.env);

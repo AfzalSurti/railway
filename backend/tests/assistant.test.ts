@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { extractDate, extractRoute, extractTime, parseMessage } from '../src/assistant/parser';
 import { handleAssistantMessage } from '../src/assistant/assistant.service';
-import { sanitizeLlmOutput } from '../src/assistant/llm-extractor';
+import { sanitizeLlmOutput } from '../src/assistant/llm-output';
 import { mergeDraft, missingSlots } from '../src/assistant/slots';
 import '../src/providers';
 
@@ -167,7 +167,7 @@ describe('assistant conversation', () => {
 });
 
 describe('LLM output sanitising (untrusted)', () => {
-  it('keeps valid slots and drops junk', () => {
+  it('keeps valid slots and drops junk, including a serviceType guess', () => {
     const out = sanitizeLlmOutput(
       {
         serviceType: 'TRAIN',
@@ -181,11 +181,53 @@ describe('LLM output sanitising (untrusted)', () => {
       },
       '2026-08-10',
     );
-    expect(out).toEqual({ serviceType: 'TRAIN', source: 'Vadodara', date: '2026-08-28' });
+    // serviceType is never trusted from the model, even if it sends one.
+    expect(out).toEqual({ source: 'Vadodara', date: '2026-08-28' });
   });
 
   it('drops past dates and non-objects', () => {
     expect(sanitizeLlmOutput({ date: '2020-01-01' }, '2026-08-10')).toEqual({});
     expect(sanitizeLlmOutput('nonsense', '2026-08-10')).toEqual({});
+  });
+});
+
+describe('OpenRouter extractor (mocked fetch, untrusted output)', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  // These exercise runOpenRouterExtraction() directly — the raw HTTP call +
+  // sanitizing, with no environment gate — since the assistant.* test suite
+  // runs with NODE_ENV=test, which openRouterExtract()/openRouterEnabled()
+  // deliberately keep offline (see "is disabled without AI_API_KEY" below).
+
+  it('sanitizes a well-formed completion into slot values', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"serviceType":"BUS","destination":"pune","extra":"ignored"}' } }],
+      }),
+    }) as unknown as typeof fetch;
+
+    const { runOpenRouterExtraction } = await import('../src/assistant/openrouter-extractor');
+    const out = await runOpenRouterExtraction('bus to pune', {}, null, '2026-08-10');
+    // serviceType is dropped even though the mocked completion sent one.
+    expect(out).toEqual({ destination: 'Pune' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null (never throws) on an HTTP error or malformed body', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) }) as unknown as typeof fetch;
+    const { runOpenRouterExtraction } = await import('../src/assistant/openrouter-extractor');
+    expect(await runOpenRouterExtraction('bus to pune', {}, null, '2026-08-10')).toBeNull();
+  });
+
+  it('is disabled in the test environment regardless of AI_API_KEY', async () => {
+    const { openRouterExtract } = await import('../src/assistant/openrouter-extractor');
+    global.fetch = vi.fn() as unknown as typeof fetch;
+    expect(await openRouterExtract('bus to pune', {}, null, '2026-08-10')).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

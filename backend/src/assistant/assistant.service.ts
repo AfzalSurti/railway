@@ -2,7 +2,7 @@ import { providerFactory } from '../providers';
 import { ProviderContext } from '../providers/base/provider-context';
 import { JourneyOption, SearchRequest, ServiceType } from '../providers/provider.types';
 import { logger } from '../utils/logger';
-import { llmExtract } from './llm-extractor';
+import { extractSlots } from './ai';
 import { parseMessage, todayIso } from './parser';
 import { resolvePlace } from './places';
 import { Draft, Slot, isTimeKnown, mergeDraft, missingSlots } from './slots';
@@ -338,7 +338,7 @@ export async function handleAssistantMessage(
   const base: Draft = input.draft ?? {};
 
   let draft = mergeDraft(base, parseMessage(input.message, awaiting, now));
-  const fromModel = await llmExtract(input.message, draft, awaiting, today);
+  const fromModel = await extractSlots(input.message, draft, awaiting, today);
   if (fromModel) draft = mergeDraft(draft, fromModel);
 
   const notices: string[] = [];
