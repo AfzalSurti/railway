@@ -348,6 +348,16 @@ function runStartingAt(tokens: string[]): string[] {
 
 const place = (tokens: string[]) => canonicalPlaceName(tokens.join(' '));
 
+// Verbs that commonly take an infinitive ("allowed to carry", "need to bring"),
+// so a bare "to" right after one of these is grammar, not a route separator.
+const INFINITIVE_VERBS = new Set([
+  'allowed', 'allow', 'want', 'wanted', 'need', 'needed', 'able', 'have', 'has', 'had',
+  'used', 'use', 'try', 'tried', 'trying', 'plan', 'planned', 'planning', 'like', 'liked',
+  'love', 'loved', 'wish', 'hope', 'hoping', 'decide', 'decided', 'get', 'got', 'going',
+  'continue', 'begin', 'began', 'start', 'started', 'stop', 'stopped', 'forget', 'forgot',
+  'remember', 'remembered', 'manage', 'managed', 'refuse', 'refused', 'agree', 'agreed', 'fail', 'failed',
+]);
+
 export function extractRoute(input: string): { source?: string; destination?: string } {
   const text = input
     .replace(/[→⇒➜➔]|->|=>/g, ' to ')
@@ -358,6 +368,7 @@ export function extractRoute(input: string): { source?: string; destination?: st
 
   for (let index = 0; index < tokens.length; index += 1) {
     if (tokens[index] !== 'to') continue;
+    if (index > 0 && INFINITIVE_VERBS.has(tokens[index - 1])) continue;
     const left = runEndingAt(tokens.slice(0, index));
     const right = runStartingAt(tokens.slice(index + 1));
     if (left.length && right.length) {

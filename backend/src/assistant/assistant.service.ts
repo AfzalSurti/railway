@@ -3,6 +3,7 @@ import { ProviderContext } from '../providers/base/provider-context';
 import { JourneyOption, SearchRequest, ServiceType } from '../providers/provider.types';
 import { logger } from '../utils/logger';
 import { extractSlots } from './ai';
+import { answerGeneralQuestion } from './general-reply';
 import { parseMessage, todayIso } from './parser';
 import { resolvePlace } from './places';
 import { Draft, Slot, isTimeKnown, mergeDraft, missingSlots } from './slots';
@@ -134,11 +135,16 @@ function needsInfo(
   missing: Slot[],
   notices: string[],
   steps: ProcessStep[],
+  aiReply?: string | null,
 ): AssistantResponse {
   const first = missing[0];
   const known = describeDraft(draft);
   const pieces: string[] = [...notices];
-  if (known) pieces.push(`Got it — ${known}.`);
+  if (aiReply) {
+    pieces.push(aiReply);
+  } else if (known) {
+    pieces.push(`Got it — ${known}.`);
+  }
   if (missing.length > 1) {
     pieces.push(`I still need ${joinList(missing.map((slot) => PROMPTS[slot].short))}.`);
   }
@@ -439,7 +445,21 @@ export async function handleAssistantMessage(
 
   const missing = missingSlots(draft);
   if (missing.length > 0 || !isTimeKnown(draft)) {
-    return needsInfo(draft, missing.length ? missing : ['time'], notices, steps);
+    // The message didn't add any new search detail — likely a genuine
+    // question ("which is cheaper", "do I need ID") rather than an attempt
+    // to answer. If an AI provider is configured, use it for a real,
+    // honest answer alongside the usual clarifying question; otherwise the
+    // conversation behaves exactly as it always has.
+    const contributedNewInfo =
+      Object.keys(ruleParsed).length > 0 || Boolean(fromModel && Object.keys(fromModel).length > 0);
+    let aiReply: string | null = null;
+    if (!contributedNewInfo) {
+      aiReply = await answerGeneralQuestion(input.message, draft);
+      if (aiReply) {
+        steps.push({ label: 'Asked the AI to answer directly', detail: aiReply, status: 'done' });
+      }
+    }
+    return needsInfo(draft, missing.length ? missing : ['time'], notices, steps, aiReply);
   }
   const result = await runSearch(draft, now);
   return { ...result, steps: [...steps, ...result.steps] };

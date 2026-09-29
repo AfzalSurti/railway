@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { extractDate, extractRoute, extractTime, parseMessage } from '../src/assistant/parser';
 import { handleAssistantMessage } from '../src/assistant/assistant.service';
 import { sanitizeLlmOutput } from '../src/assistant/llm-output';
+import { answerGeneralQuestion } from '../src/assistant/general-reply';
 import { mergeDraft, missingSlots } from '../src/assistant/slots';
 import '../src/providers';
 
@@ -255,5 +256,23 @@ describe('OpenRouter extractor (mocked fetch, untrusted output)', () => {
     global.fetch = vi.fn() as unknown as typeof fetch;
     expect(await openRouterExtract('bus to pune', {}, null, '2026-08-10')).toBeNull();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('general AI reply for off-topic / question messages', () => {
+  it('is a no-op in the test environment (no key configured for this run)', async () => {
+    // NODE_ENV=test keeps every AI path offline, same as the extractors above —
+    // this only proves it never blocks or throws, and the deterministic
+    // clarifying question still carries the conversation.
+    const reply = await answerGeneralQuestion('how much luggage can I bring?', { serviceType: 'TRAIN' });
+    expect(reply).toBeNull();
+  });
+
+  it('does not stop the deterministic flow from asking what is still missing', async () => {
+    const res = await handleAssistantMessage({ message: 'how much luggage can I bring?' }, NOW);
+    expect(res.status).toBe('NEEDS_INFO');
+    if (res.status !== 'NEEDS_INFO') return;
+    expect(res.awaiting).toBe('serviceType');
+    expect(res.reply).toContain('train, bus or flight');
   });
 });
