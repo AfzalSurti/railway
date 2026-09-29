@@ -194,7 +194,7 @@ export class MockTrainProvider extends BaseTravelProvider {
       return { status: 'FAILED', failureCode: 'UNKNOWN_ERROR', message: 'An unknown error occurred', retryable: false };
     }
 
-    const bookingReference = `MOCK-${Math.floor(100000 + Math.random() * 900000)}`;
+    const bookingReference = `VGE-${Math.floor(100000 + Math.random() * 900000)}`;
     return { status: 'SUCCESS', providerBookingReference: bookingReference, message: 'Booking confirmed' };
   }
 
@@ -209,7 +209,7 @@ export class MockTrainProvider extends BaseTravelProvider {
     if (outcome === 'UNKNOWN_RESULT_RECONCILE_CONFIRMED') {
       return {
         state: 'CONFIRMED',
-        providerBookingReference: query.providerBookingReference || `MOCK-${Math.floor(100000 + Math.random() * 900000)}`,
+        providerBookingReference: query.providerBookingReference || `VGE-${Math.floor(100000 + Math.random() * 900000)}`,
         message: 'Reconciliation found a confirmed booking on the provider.',
       };
     }

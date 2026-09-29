@@ -96,7 +96,7 @@ describe('MockTrainProvider', () => {
     const request = await bookingRequest(provider, 'SUCCESS');
     const result = await provider.executeBooking(request);
     expect(result.status).toBe('SUCCESS');
-    expect(result.providerBookingReference).toMatch(/^MOCK-/);
+    expect(result.providerBookingReference).toMatch(/^VGE-/);
   });
 });
 

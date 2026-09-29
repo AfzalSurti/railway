@@ -12,6 +12,7 @@ import { passengerService } from '../services/passenger.service';
 import { bookingService } from '../services/booking.service';
 import { providerService } from '../services/provider.service';
 import { getApiErrorMessage } from '../services/api';
+import { providerDisplayName } from '../utils/providerDisplay';
 import { useToast } from '../contexts/ToastContext';
 import type { Gender, Passenger } from '../types/passenger';
 import type { ServiceType } from '../types/booking';
@@ -208,7 +209,7 @@ export function NewBookingPage() {
                   ]
               ).map((item) => (
                 <option key={`${item.serviceType}-${item.name}`} value={item.name}>
-                  {item.name}
+                  {providerDisplayName(item.name)}
                   {item.available ? '' : ' (coming soon)'}
                 </option>
               ))}

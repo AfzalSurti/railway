@@ -10,6 +10,7 @@ import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import type { BookingTask } from '../types/booking';
 import { formatDate, formatDateTime, formatStartsIn } from '../utils/format';
+import { providerDisplayName } from '../utils/providerDisplay';
 
 export function BookingsPage() {
   const [bookings, setBookings] = useState<BookingTask[]>([]);
@@ -67,7 +68,7 @@ export function BookingsPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
-                      {booking.serviceType} · {booking.provider}
+                      {booking.serviceType} · {providerDisplayName(booking.provider)}
                     </p>
                     <p className="mt-1 text-lg font-semibold">
                       {booking.source} → {booking.destination}

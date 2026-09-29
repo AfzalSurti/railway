@@ -263,7 +263,7 @@ export const bookingExecutionService = {
             action: 'PAYMENT_AUTO_AUTHORIZED',
             metadata: { paymentMethodId: autoPayMethod.id },
           });
-          const bookingReference = `MOCK-AUTO-${Date.now()}`;
+          const bookingReference = `VGE-AUTO-${Date.now()}`;
           await transitionBookingState(bookingTaskId, BookingStatus.COMPLETED, {
             completedAt: new Date(),
             bookingReference,

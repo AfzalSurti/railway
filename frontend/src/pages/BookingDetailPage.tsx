@@ -20,6 +20,7 @@ import type {
   TicketArtifact,
 } from '../types/booking';
 import { formatDate, formatDateTime, formatStartsIn, toDatetimeLocalValue } from '../utils/format';
+import { providerDisplayName } from '../utils/providerDisplay';
 
 const ACTIVE_STATUSES = new Set([
   'QUEUED',
@@ -126,7 +127,7 @@ export function BookingDetailPage() {
   const fields = [
     ['Booking ID', booking.id],
     ['Service', booking.serviceType],
-    ['Provider', booking.provider],
+    ['Provider', providerDisplayName(booking.provider)],
     ['Current stage', booking.currentStage ? booking.currentStage.replaceAll('_', ' ') : '—'],
     ['Provider status', booking.providerStatus ?? '—'],
     ['Source', booking.source],
@@ -190,7 +191,7 @@ export function BookingDetailPage() {
                   const updated = await bookingService.runNow(booking.id, mockOutcome);
                   setBooking(updated);
                   setLogs(await bookingService.logs(booking.id));
-                  notify({ variant: 'success', title: 'Queued for mock execution' });
+                  notify({ variant: 'success', title: 'Queued for execution' });
                 } catch (error) {
                   notify({ variant: 'error', title: 'Run failed', message: getApiErrorMessage(error) });
                 }
@@ -315,7 +316,7 @@ export function BookingDetailPage() {
                     </span>
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {payment.provider}
+                    {providerDisplayName(payment.provider)}
                     {payment.failureReason ? ` · ${payment.failureReason}` : ''}
                   </p>
                 </div>
@@ -358,7 +359,7 @@ export function BookingDetailPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{ticket.fileName}</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {ticket.provider} · {(ticket.sizeBytes / 1024).toFixed(1)} KB
+                    {providerDisplayName(ticket.provider)} · {(ticket.sizeBytes / 1024).toFixed(1)} KB
                   </p>
                 </div>
                 <Button
@@ -396,7 +397,7 @@ export function BookingDetailPage() {
 
       {canRunNow ? (
         <Card className="p-6">
-          <h2 className="text-lg font-semibold">Mock outcome</h2>
+          <h2 className="text-lg font-semibold">Simulated outcome</h2>
           <p className="mt-1 text-sm text-slate-500">Development only. The worker still executes the job asynchronously.</p>
           <div className="mt-3 max-w-sm">
             <Select label="Simulated result" value={mockOutcome} onChange={(event) => setMockOutcome(event.target.value)}>
@@ -458,7 +459,7 @@ export function BookingDetailPage() {
       <Card className="p-6">
         <h2 className="text-lg font-semibold">Execution</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Provider {booking.provider}. Browser session details are never shown. No real ticket is purchased.
+          Provider {providerDisplayName(booking.provider)}. Browser session details are never shown. No real ticket is purchased.
         </p>
         <ol className="mt-5 space-y-2">
           {PIPELINE_STAGES.map((stage) => {
@@ -548,7 +549,7 @@ export function BookingDetailPage() {
         title={booking.status === 'RUNNING' ? 'Request cancellation?' : 'Cancel this booking task?'}
         description={
           booking.status === 'RUNNING'
-            ? 'The worker will stop at the next safe step. This does not kill an in-flight mock execution immediately.'
+            ? 'The worker will stop at the next safe step. This does not kill an in-flight execution immediately.'
             : 'The scheduled job will be removed. No real ticket action will be taken.'
         }
         confirmLabel={booking.status === 'RUNNING' ? 'Request cancellation' : 'Cancel task'}

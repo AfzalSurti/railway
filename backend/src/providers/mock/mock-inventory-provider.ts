@@ -73,7 +73,7 @@ export abstract class MockInventoryProvider extends BaseTravelProvider {
   }
 
   async executeBooking(_request: BookingRequest): Promise<BookingResult> {
-    const reference = `MOCK-${this.kind.slice(0, 1)}${Math.floor(100000 + Math.random() * 900000)}`;
+    const reference = `VGE-${this.kind.slice(0, 1)}${Math.floor(100000 + Math.random() * 900000)}`;
     return { status: 'SUCCESS', providerBookingReference: reference, message: 'Booking confirmed' };
   }
 }

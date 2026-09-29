@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { assistantService } from '../services/assistant.service';
 import { getApiErrorMessage } from '../services/api';
+import { providerDisplayName } from '../utils/providerDisplay';
 import type { AssistantDraft, AssistantSlot, ProcessStep, TravelOption } from '../types/assistant';
 
 type ChatItem = {
@@ -107,7 +108,7 @@ function OptionCard({
           <p className="mt-2 text-sm font-medium text-slate-800">
             {TYPE_ICON[option.serviceType]} {option.name}
             <span className="ml-2 text-xs font-normal text-slate-400">
-              {option.number} · {option.provider}
+              {option.number} · {providerDisplayName(option.provider)}
             </span>
           </p>
         </div>
@@ -179,7 +180,7 @@ function JourneyDetailsModal({
             </p>
             <h2 className="mt-1 text-xl font-bold text-slate-900">{option.name}</h2>
             <p className="text-sm text-slate-500">
-              {option.number} · {option.operator} · {option.provider}
+              {option.number} · {option.operator} · {providerDisplayName(option.provider)}
             </p>
           </div>
           <button
@@ -241,7 +242,7 @@ function JourneyDetailsModal({
         </div>
 
         <p className="mt-4 text-xs text-slate-400">
-          Mock inventory for development — no real {option.serviceType.toLowerCase()} is booked.
+          Simulated inventory for development — no real {option.serviceType.toLowerCase()} is booked.
         </p>
 
         <div className="mt-6 flex justify-end gap-3">

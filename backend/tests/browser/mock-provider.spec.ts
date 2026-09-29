@@ -21,5 +21,5 @@ test('local mock provider books Vande Bharat 20902 for Rahul Jani', async ({ pag
   expect(availability.seats).toBe('12');
   await mockPage.enterPassenger({ name: 'Rahul Jani', age: 30 });
   const reference = await mockPage.confirm();
-  expect(reference).toMatch(/^MOCK-/);
+  expect(reference).toMatch(/^VGE-/);
 });

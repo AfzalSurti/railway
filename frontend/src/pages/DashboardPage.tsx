@@ -9,6 +9,7 @@ import { getApiErrorMessage } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import type { BookingStatus, BookingTask } from '../types/booking';
 import { formatDate, formatStartsIn } from '../utils/format';
+import { providerDisplayName } from '../utils/providerDisplay';
 
 const STAT_CARDS: Array<{ key: string; label: string; statuses: BookingStatus[] }> = [
   { key: 'scheduled', label: 'Scheduled', statuses: ['SCHEDULED'] },
@@ -62,7 +63,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Operations overview</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Scheduling, queueing, and the mock provider are live. Real IRCTC booking is not implemented.
+          Scheduling, queueing, and search are live. Real ticket booking is not implemented yet.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
@@ -104,7 +105,7 @@ export function DashboardPage() {
                       <p className="mt-1 text-sm text-slate-500">
                         {formatDate(booking.journeyDate)}
                         {booking.trainNumber ? ` · ${booking.trainNumber}` : ''}
-                        {booking.provider ? ` · ${booking.provider}` : ''}
+                        {booking.provider ? ` · ${providerDisplayName(booking.provider)}` : ''}
                       </p>
                       {booking.status === 'SCHEDULED' ? (
                         <p className="mt-2 text-sm font-medium text-brand-700">

@@ -73,7 +73,7 @@ export function DashboardLayout() {
             Menu
           </button>
           <div className="hidden text-sm text-slate-500 lg:block">
-            Schedule travel tasks. Real bookings are not executed in Phase 1.
+            Find, schedule, and track travel tasks. Real ticket purchases are not enabled yet.
           </div>
           <div className="flex items-center gap-3">
             <button

@@ -108,7 +108,7 @@ describe('Booking execution engine', () => {
     expect(run.body.data.completedAt).toBeNull();
 
     const completed = await waitForBookingStatus(id, BookingStatus.COMPLETED);
-    expect(completed.bookingReference).toMatch(/^MOCK-/);
+    expect(completed.bookingReference).toMatch(/^VGE-/);
     const logs = await request(app).get(`/api/bookings/${id}/logs`).set('Authorization', `Bearer ${token}`);
     const steps = (logs.body.data as Array<{ step: string }>).map((log) => log.step);
     expect(steps).toContain('BOOKING_CREATED');
@@ -232,7 +232,7 @@ describe('Booking execution engine', () => {
     expect(resumed.body.data.status).toBe('QUEUED');
 
     const completed = await waitForBookingStatus(id, BookingStatus.COMPLETED, 60000);
-    expect(completed.bookingReference).toMatch(/^MOCK-/);
+    expect(completed.bookingReference).toMatch(/^VGE-/);
   });
 
   it('pauses on PAYMENT_REQUIRED', async () => {

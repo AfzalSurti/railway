@@ -8,6 +8,7 @@ import { BookingRequest, TravelProvider } from '../providers/base/travel-provide
 import { ExecutionStage, JourneyOption, SearchRequest } from '../providers/provider.types';
 import { ProviderTimeoutError } from '../providers/provider-errors';
 import { toDateOnly } from '../utils/mappers';
+import { providerDisplayName } from '../utils/providerDisplay';
 import { ticketService } from '../services/ticket.service';
 import { logger } from '../utils/logger';
 import { withTimeout } from '../utils/timeout';
@@ -185,13 +186,13 @@ export class ProviderBookingExecutor implements BookingExecutor {
         return {
           outcome: 'FAILED',
           failureCode: 'PROVIDER_CAPABILITY_UNSUPPORTED',
-          failureReason: `Provider ${providerName} does not support ${capability}`,
+          failureReason: `Provider ${providerDisplayName(providerName)} does not support ${capability}`,
           retryable: false,
         };
       }
     }
 
-    await emit('OPENING_PROVIDER', `Opening provider ${providerName}`, 'INFO', { provider: providerName });
+    await emit('OPENING_PROVIDER', `Opening provider ${providerDisplayName(providerName)}`, 'INFO', { provider: providerName });
 
     const searchRequest: SearchRequest = {
       serviceType: booking.serviceType,
